@@ -1,0 +1,33 @@
+{
+  "phase": "48",
+  "mode": "SIM",
+  "symbol": "SPY",
+
+  "indicator_assertion_hash": "adfd720d6e725b4eb70aa88fd7f3ff080c537a07d0f3a0fbca1827ac38f7bb6b",
+
+  "intent": {
+    "action": "BUY",
+    "quantity": 1,
+    "right": "C"
+  },
+
+  "envelope": {
+    "envelope_hash": "350d740f583e75720fde42c921ba25aa6733769540985107870fbadfdb5b7d2a",
+    "execution_mode": "SIM"
+  },
+
+  "sizing": {
+    "final_quantity": 1
+  },
+
+  "execution": {
+    "status": "SUBMITTED",
+    "parity_hash": "9e0c8723f83d7ee95f52a5ee35220f4ad6416cab6563b915b8524bb73fac597c"
+  },
+
+  "engine_versions": {
+    "signal": "PHASE28_SIGNAL_EXISTENCE",
+    "sizing": "PHASE34_47_POSITION_SIZING_V2",
+    "balance": "PHASE47_BALANCE_AUTHORITY_V1"
+  }
+}

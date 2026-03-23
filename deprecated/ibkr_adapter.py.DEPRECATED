@@ -1,0 +1,102 @@
+# DO NOT USE — replaced by ibkr_runtime.py
+#
+# ibkr_adapter.py
+#
+# Brokerage-grade IBKR execution adapter
+# Single socket, contract-first, TWS-compliant
+#
+
+import os
+import threading
+from typing import Optional
+
+from ibapi.client import EClient
+from ibapi.wrapper import EWrapper
+from ibapi.contract import Contract
+from ibapi.order import Order
+
+from execution_contracts import ExecutionIntent, ExecutionResult
+
+
+class IBKRExecutionAdapter(EWrapper, EClient):
+    """
+    Single-connection, production-grade IBKR execution adapter.
+    """
+
+    def __init__(self, account_id: str):
+        EClient.__init__(self, self)
+
+        self.account_id = account_id
+
+        self._ready = threading.Event()
+        self._next_order_id: Optional[int] = None
+
+        self.connect(
+            host="10.138.0.6",
+            port=7497,
+            clientId=int(os.getenv("IBKR_CLIENT_ID", "201")),
+        )
+
+        threading.Thread(target=self.run, daemon=True).start()
+
+        if not self._ready.wait(timeout=10):
+            raise RuntimeError("IBKR execution adapter failed to initialize")
+
+    # =========================
+    # IBKR lifecycle callbacks
+    # =========================
+
+    def nextValidId(self, orderId: int):
+        self._next_order_id = orderId
+        self._ready.set()
+
+    # =========================
+    # Execution
+    # =========================
+
+    def execute(self, intent: ExecutionIntent) -> ExecutionResult:
+        """
+        Execute a validated ExecutionIntent.
+        Submission-only semantics (TWS-compliant).
+        """
+
+        if self._next_order_id is None:
+            raise RuntimeError("IBKR not ready for order placement")
+
+        qc = intent.contract
+
+        # ---- Contract (conId authoritative) ----
+        contract = Contract()
+        contract.conId = qc.conid
+        contract.secType = "STK"
+        contract.exchange = qc.exchange
+        contract.currency = qc.currency
+
+        # ---- Order ----
+        order = Order()
+        order.action = intent.action              # BUY / SELL (authoritative)
+        order.orderType = intent.order_type
+        order.totalQuantity = intent.quantity
+        order.tif = intent.tif
+        order.account = self.account_id
+
+        if intent.order_type == "LMT":
+            if intent.limit_price is None:
+                raise ValueError("Limit price required for LMT orders")
+            order.lmtPrice = intent.limit_price
+
+        oid = self._next_order_id
+        self._next_order_id += 1
+
+        self.placeOrder(oid, contract, order)
+
+        return ExecutionResult(
+            status="SUBMITTED",
+            order_id=oid,
+            reason=None,
+            raw={
+                "conId": qc.conid,
+                "action": intent.action,
+                "qty": intent.quantity,
+            },
+        )

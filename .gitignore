@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Secrets & credentials
+*.json.bak
+rogueops-poc-*.json
+rogue-ops-bootstrap.json
+
+# Data & logs
+*.db
+*.jsonl
+data/
+
+# Environment
+.env
+.local/
+.venv/
+venv/
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test cache
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Shell history
+.bash_history

@@ -1,0 +1,142 @@
+ROGUE:OPS — PRODUCTION GO / NO-GO CHECKLIST
+VERSION: 1.0
+AUTHORITY: OPS CORE
+SCOPE: PAPER LIVE / CAPITAL LIVE
+LAST UPDATED: 2026-01-14
+
+==================================================
+ABSOLUTE RULE
+==================================================
+IF ANY ITEM BELOW IS NOT TRUE → NO-GO
+NO EXCEPTIONS
+NO OVERRIDES
+NO "JUST TESTING"
+
+==================================================
+1. ENVIRONMENT SANITY
+==================================================
+[ ] OPS_ENV is explicitly set (PAPER or PROD)
+[ ] EXECUTION_MODE is explicitly set (SIM / PAPER / CAPITAL)
+[ ] CAPITAL_ARMED is FALSE for Paper Live
+[ ] CAPITAL_ARMED is TRUE ONLY for Capital Live
+[ ] OPS_KILL_SWITCH is FALSE at startup
+[ ] Python virtual environment is active
+[ ] Correct repo / fork confirmed
+[ ] No uncommitted changes in execution-critical files
+
+==================================================
+2. KILL SWITCH DOMINANCE
+==================================================
+[ ] kill_switch.py present and hardened
+[ ] kill_active() returns TRUE when OPS_KILL_SWITCH=true
+[ ] engage_kill() irreversibly halts the process
+[ ] Envelope creation blocked when kill is active
+[ ] Execution router blocks when kill is active
+[ ] State machine enters HALTED on kill
+[ ] Restart required to clear kill state
+
+==================================================
+3. EXECUTION AUTHORITY
+==================================================
+[ ] ExecutionEnvelope includes:
+    - action (ENTRY / EXIT)
+    - execution_mode
+    - ops_state
+    - risk_ok
+    - authorized
+    - created_utc (UTC, Z)
+    - envelope_hash
+[ ] Envelope creation is FAIL-CLOSED
+[ ] EXIT envelopes bypass risk but not kill
+[ ] No code path executes without an envelope
+
+==================================================
+4. STATE MACHINE INTEGRITY
+==================================================
+[ ] State machine never calls broker directly
+[ ] ENTRY authorization only from IDLE
+[ ] EXIT only from MANAGING_POSITION
+[ ] Invalid transitions engage kill
+[ ] HALTED is terminal until restart
+[ ] Lifecycle callbacks wired correctly:
+    - on_position_opened
+    - on_position_closed
+    - on_audit_complete
+
+==================================================
+5. EXECUTION ROUTER HARDENING
+==================================================
+[ ] ENV_EXECUTION_MODE matches envelope.execution_mode
+[ ] CAPITAL requires CAPITAL_ARMED=true
+[ ] EXIT always permitted unless killed
+[ ] CAPITAL sizing guard enforced
+[ ] Broker exceptions converted to BLOCKED
+[ ] ExecutionResult populated with:
+    - status
+    - order_id
+    - executed_utc
+    - parity_hash
+    - raw payload
+[ ] All executions audited
+
+==================================================
+6. RISK & CAPITAL PROTECTION
+==================================================
+[ ] RiskEngineV2 active
+[ ] Options-only enforced
+[ ] Symbol restrictions enforced (SPY / IWM)
+[ ] Quantity caps enforced
+[ ] Session enforcement active
+[ ] Daily loss hard lock active
+[ ] Daily loss breach engages kill
+[ ] New trading day resets PnL
+
+==================================================
+7. POSITION & EXIT SAFETY
+==================================================
+[ ] Position model immutable
+[ ] Position.to_exit_intent() uses canonical helpers
+[ ] EXIT intent preserves lineage
+[ ] EXIT always reverses ENTRY action
+[ ] No strategy logic in exit path
+
+==================================================
+8. PAPER LIVE REQUIREMENTS
+==================================================
+[ ] EXECUTION_MODE=PAPER
+[ ] CAPITAL_ARMED=false
+[ ] IBKR Paper account confirmed
+[ ] Small contract size verified (≤1 recommended)
+[ ] Manual kill switch tested
+[ ] Simulated exit tested
+[ ] Audit records confirmed
+
+==================================================
+9. CAPITAL LIVE REQUIREMENTS (FUTURE)
+==================================================
+[ ] EXECUTION_MODE=CAPITAL
+[ ] CAPITAL_ARMED=true
+[ ] Capital allocation explicitly approved
+[ ] MAX_DAILY_LOSS_USD reviewed
+[ ] MAX_CAPITAL_NOTIONAL_USD reviewed
+[ ] MAX_CAPITAL_CONTRACTS reviewed
+[ ] Kill switch tested same-day
+[ ] Broker account verified
+[ ] No Paper-only flags enabled
+
+==================================================
+10. FINAL SIGN-OFF
+==================================================
+Operator Name: ___________________________
+Date (UTC): ______________________________
+Mode (PAPER / CAPITAL): ___________________
+
+I affirm that ALL items above are TRUE.
+I understand that violation of this checklist
+invalidates the run and requires shutdown.
+
+SIGNATURE: _______________________________
+
+==================================================
+END OF CHECKLIST
+==================================================
