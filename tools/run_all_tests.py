@@ -24,6 +24,7 @@ DEFAULT_TESTS = [
     "test_safety_governor",
     "test_fill_pnl",
     "test_massive_client",
+    "test_backtest",
     "run_sim_regression",
 ]
 
