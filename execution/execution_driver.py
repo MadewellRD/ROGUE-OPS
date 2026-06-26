@@ -19,7 +19,7 @@
 import os
 from typing import Optional
 
-from execution.execution_router import execute
+from execution.execution_router import execute, execute_sized
 from execution.execution_position_bridge import ExecutionPositionBridge
 from execution.execution_envelope import ExecutionEnvelope
 from execution.state_machine import StateMachineV2
@@ -99,9 +99,16 @@ def execute_and_apply(
     # EXECUTION (AUTHORITATIVE)
     # --------------------------------------------------
     try:
-        result = execute(envelope, account_id)
+        # ENTRY must go through the SIZED path; EXIT through the exit path.
+        if envelope.action == "ENTRY":
+            result = execute_sized(envelope, account_id)
+        else:
+            result = execute(envelope, account_id)
     except Exception as e:
-        print(f"[ERROR] Execution failed for envelope {envelope.id}: {e}")
+        print(f"[ERROR] Execution failed for envelope {envelope.envelope_hash}: {e}")
+        return False
+
+    if result.status != "SUBMITTED":
         return False
 
     # --------------------------------------------------
@@ -110,27 +117,27 @@ def execute_and_apply(
     bridge = ExecutionPositionBridge(state_machine=state_machine)
 
     if envelope.action == "ENTRY":
-        if entry_price is None:
-            print("[ERROR] Missing entry_price for ENTRY action.")
+        # Prefer the actual fill from the broker/SIM result; fall back to a
+        # caller-supplied price only if the result carries none.
+        fill_price = result.raw.get("fill_price", entry_price)
+        if fill_price is None:
+            print("[ERROR] No fill price available for ENTRY.")
             return False
 
         bridge.handle_entry(
             envelope=envelope,
-            fill_price=entry_price,
+            entry_price=fill_price,
             result=result,
         )
 
     elif envelope.action == "EXIT":
-        bridge.handle_exit(
+        exit_result = bridge.handle_exit(
             envelope=envelope,
             result=result,
         )
 
-        # CAPITAL ONLY — realized loss governance
-        if envelope.execution_mode == "CAPITAL":
-            record_realized_pnl(
-                account_id=account_id,
-                envelope=envelope,
-            )
+        # Realized-loss governance — feed the daily-loss governor so the
+        # daily-loss kill can actually engage (applies to all live modes).
+        record_realized_pnl(pnl_usd=exit_result["realized_pnl_usd"])
 
     return True

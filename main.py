@@ -87,80 +87,96 @@ def run_application():
     ops_config = load_ops_config()
 
     # --------------------------------------------------
-    # REQUIRED ENVIRONMENT VARIABLES
+    # MODE RESOLUTION
+    #
+    # SIM and REPLAY are fully self-contained: no GCP, no broker,
+    # no credentials. Cloud/broker dependencies are required ONLY
+    # for PAPER / LIVE / CAPITAL.
     # --------------------------------------------------
-    GCP_PROJECT_ID = os.getenv("GCP_PROJECT_ID")
-    DOCTRINE_BUCKET = os.getenv("DOCTRINE_BUCKET")
     EXECUTION_MODE = os.getenv("EXECUTION_MODE", "SIM")
-
-    IBKR_ACCOUNT_ID = (
-        args.ibkr
-        or os.getenv("IBKR_ACCOUNT_ID")
-        or "DU1234567"
-    )
-
-    GOOGLE_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-
-    if not GCP_PROJECT_ID:
-        raise RuntimeError("GCP_PROJECT_ID is not set")
-    if not DOCTRINE_BUCKET:
-        raise RuntimeError("DOCTRINE_BUCKET is not set")
-    if not GOOGLE_CREDENTIALS:
-        raise RuntimeError("GOOGLE_APPLICATION_CREDENTIALS is not set")
-
-    cred_path = Path(GOOGLE_CREDENTIALS)
-    if not cred_path.exists():
-        raise RuntimeError(f"Credential file not found: {cred_path}")
 
     if EXECUTION_MODE not in ("SIM", "PAPER", "LIVE", "CAPITAL"):
         raise RuntimeError(f"Invalid EXECUTION_MODE: {EXECUTION_MODE}")
+
+    sim_like = EXECUTION_MODE == "SIM" or ops_config.mode in ("SIM", "REPLAY")
+
+    BROKER_ACCOUNT_ID = (
+        args.ibkr
+        or os.getenv("ROBINHOOD_ACCOUNT_ID")
+        or os.getenv("IBKR_ACCOUNT_ID")
+        or "SIM"
+    )
 
     print(f"  [OPS_MODE ] {ops_config.mode}")
     print(f"  [OPS_ENV  ] {ops_config.environment}")
     print(f"  [VERSION  ] {ops_config.version}")
     print(f"  [EXECUTE  ] {EXECUTION_MODE}")
-    print(f"  [IBKR    ] {IBKR_ACCOUNT_ID}")
-    print(f"  [CREDS   ] {cred_path}")
+    print(f"  [ACCOUNT  ] {BROKER_ACCOUNT_ID}")
 
-    # --------------------------------------------------
-    # LOAD DOCTRINE + SECRETS
-    # --------------------------------------------------
-    load_doctrine_from_gcs(
-        project_id=GCP_PROJECT_ID,
-        bucket_name=DOCTRINE_BUCKET,
-    )
+    steady_api_key = None
 
-    api_keys = get_api_keys(
-        project_id=GCP_PROJECT_ID,
-        secret_names=["openai-api-key", "steadyapi-key"],
-    )
+    if sim_like:
+        print("  [OK] SIM/REPLAY mode — GCP, broker, and secrets skipped")
+    else:
+        # --------------------------------------------------
+        # REQUIRED ENVIRONMENT VARIABLES (CLOUD/BROKER MODES)
+        # --------------------------------------------------
+        GCP_PROJECT_ID = os.getenv("GCP_PROJECT_ID")
+        DOCTRINE_BUCKET = os.getenv("DOCTRINE_BUCKET")
+        GOOGLE_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
 
-    print("  [OK] Doctrine loaded")
-    print("  [OK] Secrets retrieved")
+        if not GCP_PROJECT_ID:
+            raise RuntimeError("GCP_PROJECT_ID is not set")
+        if not DOCTRINE_BUCKET:
+            raise RuntimeError("DOCTRINE_BUCKET is not set")
+        if not GOOGLE_CREDENTIALS:
+            raise RuntimeError("GOOGLE_APPLICATION_CREDENTIALS is not set")
 
-    # --------------------------------------------------
-    # STEADYAPI HEALTH CHECK
-    # --------------------------------------------------
-    steady_api_key = api_keys.get("steadyapi-key")
+        cred_path = Path(GOOGLE_CREDENTIALS)
+        if not cred_path.exists():
+            raise RuntimeError(f"Credential file not found: {cred_path}")
 
-    try:
-        get_market_snapshot(
-            symbol="SPY",
-            source=ops_config.mode,
-            api_key=steady_api_key,
+        print(f"  [CREDS    ] {cred_path}")
+
+        # --------------------------------------------------
+        # LOAD DOCTRINE + SECRETS
+        # --------------------------------------------------
+        load_doctrine_from_gcs(
+            project_id=GCP_PROJECT_ID,
+            bucket_name=DOCTRINE_BUCKET,
         )
-        log_vendor_health(
-            vendor="STEADYAPI",
-            symbol="SPY",
-            success=True,
+
+        api_keys = get_api_keys(
+            project_id=GCP_PROJECT_ID,
+            secret_names=["openai-api-key", "steadyapi-key"],
         )
-    except Exception as e:
-        log_vendor_health(
-            vendor="STEADYAPI",
-            symbol="SPY",
-            success=False,
-            reason=str(e),
-        )
+
+        print("  [OK] Doctrine loaded")
+        print("  [OK] Secrets retrieved")
+
+        # --------------------------------------------------
+        # STEADYAPI HEALTH CHECK
+        # --------------------------------------------------
+        steady_api_key = api_keys.get("steadyapi-key")
+
+        try:
+            get_market_snapshot(
+                symbol="SPY",
+                source=ops_config.mode,
+                api_key=steady_api_key,
+            )
+            log_vendor_health(
+                vendor="STEADYAPI",
+                symbol="SPY",
+                success=True,
+            )
+        except Exception as e:
+            log_vendor_health(
+                vendor="STEADYAPI",
+                symbol="SPY",
+                success=False,
+                reason=str(e),
+            )
 
     # --------------------------------------------------
     # CAPITAL PREFLIGHT
@@ -175,7 +191,7 @@ def run_application():
     # STATE MACHINE (AUTHORITATIVE INSTANCE)
     # --------------------------------------------------
     state_machine = StateMachineV2(
-        ibkr_account_id=IBKR_ACCOUNT_ID,
+        ibkr_account_id=BROKER_ACCOUNT_ID,
     )
 
     # --------------------------------------------------
@@ -205,7 +221,7 @@ def run_application():
             strategy_registry=registry,
             primary_symbol="SPY",
             state_machine=state_machine,
-            account_id=IBKR_ACCOUNT_ID,
+            account_id=BROKER_ACCOUNT_ID,
         )
         return
 

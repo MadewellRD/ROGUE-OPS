@@ -20,3 +20,23 @@ def build_stock_contract(symbol: str) -> Contract:
     c.primaryExchange = "NASDAQ" if symbol in ("QQQ",) else "NYSE"
     c.currency = "USD"
     return c
+
+
+def build_option_contract(symbol: str, option) -> Contract:
+    """
+    Build a fully-specified IBKR OPT contract from an OptionSpec.
+
+    A fully-specified option (symbol + expiry + strike + right + multiplier)
+    is directly placeable; no conId round-trip is required for submission.
+    `option` is execution.execution_contracts.OptionSpec.
+    """
+    c = Contract()
+    c.symbol = symbol
+    c.secType = "OPT"
+    c.exchange = "SMART"
+    c.currency = "USD"
+    c.lastTradeDateOrContractMonth = option.expiry   # YYYYMMDD
+    c.strike = float(option.strike)
+    c.right = option.right                            # "C" / "P"
+    c.multiplier = str(option.multiplier)
+    return c

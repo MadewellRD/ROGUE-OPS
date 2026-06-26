@@ -79,7 +79,10 @@ class RiskEngineV2:
         # Daily loss hard lock
         # ----------------------------
 
-        if _DAILY_PNL_USD <= -MAX_DAILY_LOSS_USD:
+        # Single source of truth for realized P&L lives in the daily-loss
+        # governor; consult it so a prior breach blocks new entries.
+        from capital.daily_loss_governor import is_breached as _daily_loss_breached
+        if _daily_loss_breached():
             engage_kill(reason="DAILY_LOSS_LIMIT_BREACHED")
             raise RuntimeError("Daily loss limit breached — trading halted")
 

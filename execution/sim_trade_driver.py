@@ -56,15 +56,16 @@ def get_sim_snapshot() -> MarketSnapshot:
 # ==================================================
 
 def get_sim_indicator_assertion() -> IndicatorAssertion:
+    # Keys MUST match advisory.signal_engine.REQUIRED_INDICATORS exactly,
+    # otherwise the signal engine fails the presence check and emits NONE.
     required = {
         "VWAP_Position": "above",
-        "EMA9_Position": "above",
-        "EMA9_Slope": "up",
+        "EMA(9)": 499.50,
+        "EMA(21)": 498.00,
         "RSI(7)": 62.0,
+        "RSI(14)": 58.0,
         "MACD_Histogram": 0.30,
         "ATR": 1.25,
-        "Volume_State": "expanding",
-        "IWM_VWAP_Alignment": "aligned",
     }
 
     advisory = {

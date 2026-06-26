@@ -27,7 +27,6 @@ from market.market_data import MarketSnapshot
 from governance.ops_state import get_ops_state
 from governance.kill_switch import kill_active, engage_kill
 from advisory.time_authority import evaluate_entry_time
-from capital.capital_gate import evaluate_capital_gate
 
 from governance.risk_engine import RiskEngineV2
 from execution.position_store import get_position_store
@@ -137,14 +136,10 @@ class StateMachineV2:
 
         # ----------------------------
         # CAPITAL Readiness Gate (PHASE 31)
+        # Enforced authoritatively in execution_router.execute_sized() against
+        # the sealed ExecutionEnvelope. The prior call here used a stale
+        # signature (intent=/ops_state=) and ran before the envelope existed.
         # ----------------------------
-        if execution_mode == "CAPITAL":
-            capital_allowed, capital_reason = evaluate_capital_gate(
-                intent=intent,
-                ops_state=self.ops.get(),
-            )
-            if not capital_allowed:
-                raise RuntimeError(f"CAPITAL_BLOCKED:{capital_reason}")
 
         # ----------------------------
         # Risk authority (supreme)
@@ -189,6 +184,7 @@ class StateMachineV2:
         self,
         *,
         snapshot: MarketSnapshot,
+        indicators: dict,
         execution_mode: str,
     ) -> ExecutionEnvelope | None:
         """
@@ -204,6 +200,7 @@ class StateMachineV2:
         directive = self.exit_engine.evaluate(
             position=self.positions.get_open_position(),
             snapshot=snapshot,
+            indicators=indicators,
             ops_halted=self.ops.is_halted() or kill_active(),
         )
 

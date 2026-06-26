@@ -8,8 +8,9 @@
 import os
 import datetime
 
-from google.cloud import secretmanager, storage, firestore
-from google.oauth2 import service_account
+# NOTE: google-cloud libraries are imported lazily inside the functions
+# that need them, so this module (and anything that imports it, e.g.
+# main.py) can load in SIM/REPLAY mode without the GCP SDK installed.
 
 
 # --------------------------------------------------
@@ -31,6 +32,8 @@ def _load_credentials():
     if not os.path.isfile(cred_path):
         raise RuntimeError(f"Credential file not found: {cred_path}")
 
+    from google.oauth2 import service_account
+
     return service_account.Credentials.from_service_account_file(cred_path)
 
 
@@ -49,6 +52,8 @@ def log_uncertainty_measurement(
     Writes the results of an uncertainty measurement to Firestore.
     """
     print("  [PROCESS] Writing uncertainty measurement to audit log...")
+
+    from google.cloud import firestore
 
     creds = _load_credentials()
 
@@ -85,6 +90,8 @@ def get_api_keys(project_id: str, secret_names: list) -> dict:
     """
     print("  [PROCESS] Accessing API keys from Secret Manager...")
 
+    from google.cloud import secretmanager
+
     creds = _load_credentials()
     client = secretmanager.SecretManagerServiceClient(credentials=creds)
 
@@ -110,6 +117,8 @@ def load_doctrine_from_gcs(project_id: str, bucket_name: str) -> dict:
     Loads all doctrine files from the specified GCS bucket.
     """
     print("  [PROCESS] Loading doctrine from Cloud Storage...")
+
+    from google.cloud import storage
 
     creds = _load_credentials()
     storage_client = storage.Client(

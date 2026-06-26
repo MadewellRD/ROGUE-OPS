@@ -36,8 +36,9 @@ SIM_MAX_NOTIONAL_USD = 100_000
 SIM_MAX_CONTRACTS = 10
 
 # PAPER / CAPITAL — production hard limits
+# Aligned to CAPITAL_GO_LIVE_AUTHORIZATION.md (max 5 contracts / trade).
 MAX_CAPITAL_NOTIONAL_USD = 5_000
-MAX_CAPITAL_CONTRACTS = 10
+MAX_CAPITAL_CONTRACTS = 5
 
 
 # ==================================================
@@ -88,13 +89,18 @@ def _sim_execute(envelope: ExecutionEnvelope, quantity: int) -> ExecutionResult:
         16,
     )
 
+    # Deterministic synthetic fill so the SIM lifecycle (open/close + P&L) is
+    # exercisable end to end. Not a market model — SIM is a dry run.
+    opt = envelope.intent.option
+    fill_price = round(max(0.05, opt.strike * 0.002), 2) if opt else 1.00
+
     return ExecutionResult(
         status="SUBMITTED",
         order_id=synthetic_order_id,
         reason="SIM",
         executed_utc=now_utc(),
         parity_hash=parity,
-        raw={},
+        raw={"fill_price": fill_price, "sim": True},
     )
 
 
@@ -122,13 +128,16 @@ def execute(envelope: ExecutionEnvelope, account_id: str) -> ExecutionResult:
         return result
 
     from capital.capital_gate import evaluate_capital_gate
-    from broker.ibkr_runtime import get_ibkr_runtime
+    from broker.broker_runtime import get_broker_runtime, BrokerCapabilityError
 
     allowed, reason = evaluate_capital_gate(envelope)
     if not allowed:
         return _blocked(audit, envelope, reason)
 
-    runtime = get_ibkr_runtime()
+    try:
+        runtime = get_broker_runtime(envelope.intent)
+    except BrokerCapabilityError as e:
+        return _blocked(audit, envelope, "BROKER_UNSUPPORTED", {"error": str(e)})
 
     try:
         broker_result = runtime.execute_intent(envelope.intent)
@@ -198,7 +207,7 @@ def execute_sized(envelope: ExecutionEnvelope, account_id: str) -> ExecutionResu
     # --------------------------------------------------
 
     from capital.capital_gate import evaluate_capital_gate
-    from broker.ibkr_runtime import get_ibkr_runtime
+    from broker.broker_runtime import get_broker_runtime, BrokerCapabilityError
 
     allowed, reason = evaluate_capital_gate(envelope)
     if not allowed:
@@ -221,7 +230,10 @@ def execute_sized(envelope: ExecutionEnvelope, account_id: str) -> ExecutionResu
     if notional > MAX_CAPITAL_NOTIONAL_USD:
         return _blocked(audit, envelope, "CAPITAL_NOTIONAL_LIMIT", {"notional": notional})
 
-    runtime = get_ibkr_runtime()
+    try:
+        runtime = get_broker_runtime(envelope.intent)
+    except BrokerCapabilityError as e:
+        return _blocked(audit, envelope, "BROKER_UNSUPPORTED", {"error": str(e)})
 
     try:
         broker_result = runtime.execute_intent(

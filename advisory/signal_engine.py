@@ -39,7 +39,10 @@ ENTRY_ACTION = "BUY"
 OPTION_RIGHT = "C"
 STRIKE_ROUNDING = 1.0
 
-# EXACT required indicator keys as emitted by api_clients.py
+# Required indicator keys for signal EXISTENCE. The feed now supplies OHLCV
+# (Phase 4), so VWAP_Position and ATR are computed and required again. Signals
+# are fail-closed: if any required indicator cannot be computed (e.g. the feed
+# stops supplying OHLCV), required_passed is False and no signal is emitted.
 REQUIRED_INDICATORS = {
     "VWAP_Position",
     "EMA(9)",
@@ -103,6 +106,10 @@ class SignalEngine:
             return None
 
         if not REQUIRED_INDICATORS.issubset(indicators.required.keys()):
+            return None
+
+        # Do not emit on warmup/garbage: every required indicator value present.
+        if not indicators.required_passed:
             return None
 
         # --------------------------------------------------

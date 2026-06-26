@@ -1,0 +1,14 @@
+#
+# requirements-sim.txt
+#
+# Minimal dependencies to run ROGUE:OPS in SIM mode on a dev box
+# (Windows / macOS / Linux). SIM mode needs NO broker (ibapi) and
+# NO Google Cloud SDK — those are only required for PAPER/LIVE/CAPITAL.
+#
+# Install:
+#   python -m pip install -r requirements-sim.txt
+#
+
+# Imported transitively by main.py's market data adapter.
+# The SIM execution path itself makes no network calls.
+requests

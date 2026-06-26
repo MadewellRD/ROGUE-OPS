@@ -1,0 +1,124 @@
+#
+# api/terminal_state.py
+#
+# Terminal State Aggregator
+#
+# Gathers a point-in-time view of ROGUE:OPS for the operator terminal:
+# kill/ops state, capital, risk/daily-loss, the open position, and the latest
+# market frame (spot + indicators + signal status) published by the market loop.
+#
+# Read-only. Defensive. Never raises (the terminal must render even mid-failure).
+#
+
+import os
+import datetime as dt
+from typing import Any, Dict, Optional
+
+# Latest market frame published by the live loop (transient, in-memory).
+_LAST_FRAME: Dict[str, Any] = {}
+
+
+def _now() -> str:
+    return (
+        dt.datetime.now(dt.timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+
+
+def publish_frame(*, snapshot=None, indicators=None, signal_status: Optional[str] = None) -> None:
+    """Called by the market loop each cycle to surface live market state."""
+    global _LAST_FRAME
+    frame: Dict[str, Any] = {"ts_utc": _now()}
+    if snapshot is not None:
+        frame["symbol"] = getattr(snapshot, "symbol", None)
+        frame["spot"] = getattr(snapshot, "spot", None)
+        frame["session"] = getattr(snapshot, "session", None)
+        frame["source"] = getattr(snapshot, "source", None)
+    if indicators is not None:
+        req = dict(getattr(indicators, "required", {}) or {})
+        adv = dict(getattr(indicators, "advisory", {}) or {})
+        frame["indicators"] = req
+        frame["vwap"] = adv.get("VWAP")
+        frame["required_passed"] = getattr(indicators, "required_passed", None)
+    if signal_status is not None:
+        frame["signal_status"] = signal_status
+    _LAST_FRAME = frame
+
+
+def _safe(fn, default=None):
+    try:
+        return fn()
+    except Exception as e:  # pragma: no cover - terminal must not crash
+        return {"error": str(e)} if default is None else default
+
+
+def get_terminal_state() -> Dict[str, Any]:
+    state: Dict[str, Any] = {
+        "ts_utc": _now(),
+        "system": "ROGUE:OPS",
+        "mode": os.getenv("EXECUTION_MODE", "SIM"),
+        "ops_env": os.getenv("OPS_ENV", ""),
+        "ops_mode": os.getenv("OPS_MODE", ""),
+    }
+
+    def _kill():
+        from governance.kill_switch import kill_context
+        return kill_context()
+    state["kill"] = _safe(_kill)
+
+    def _risk():
+        from capital.daily_loss_governor import current_realized_pnl, is_breached, _max_loss
+        return {
+            "realized_pnl_usd": current_realized_pnl(),
+            "max_daily_loss_usd": _max_loss(),
+            "breached": is_breached(),
+        }
+    state["risk"] = _safe(_risk)
+
+    def _capital():
+        try:
+            from capital.balance_store import get_snapshot
+            account = os.getenv("ROGUE_BALANCE_ACCOUNT", "IBKR")
+            snap = get_snapshot(account_id=account, max_age_seconds=86400)
+        except Exception:
+            return None
+        if snap is None:
+            return None
+        return {
+            "net_liquidation": getattr(snap, "net_liquidation", None),
+            "available_funds": getattr(snap, "available_funds", None),
+            "excess_liquidity": getattr(snap, "excess_liquidity", None),
+            "buying_power": getattr(snap, "buying_power", None),
+            "currency": getattr(snap, "currency", None),
+            "as_of": getattr(snap, "timestamp_utc", None),
+        }
+    state["capital"] = _capital()
+
+    def _position():
+        from execution.position_store import get_position_store
+        ps = get_position_store()
+        if not ps.has_open_position():
+            return None
+        p = ps.get_open_position()
+        return {
+            "symbol": getattr(p, "symbol", None),
+            "right": getattr(p, "right", None),
+            "strike": getattr(p, "strike", None),
+            "expiry": getattr(p, "expiry", None),
+            "action": getattr(p, "action", None),
+            "quantity": getattr(p, "quantity", None),
+            "entry_price": getattr(p, "entry_price", None),
+            "opened_at_utc": str(getattr(p, "opened_at_utc", "")),
+        }
+    state["position"] = _safe(_position)
+
+    state["market"] = _LAST_FRAME or None
+
+    state["brokers"] = {
+        "options": os.getenv("BROKER", "IBKR") if os.getenv("BROKER") else "IBKR",
+        "equities": os.getenv("EQUITY_BROKER", "ROBINHOOD"),
+    }
+
+    return state

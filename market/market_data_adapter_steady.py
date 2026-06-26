@@ -196,10 +196,33 @@ def get_market_snapshot(
     # Normalization Authority (SEALED)
     # --------------------------------------------------
 
+    # --------------------------------------------------
+    # OHLCV (Phase 4) — best-effort from the quote payload
+    # --------------------------------------------------
+
+    def _num(*keys):
+        for k in keys:
+            v = quote.get(k)
+            if v is not None:
+                try:
+                    return float(str(v).replace("$", "").replace(",", ""))
+                except (TypeError, ValueError):
+                    continue
+        return None
+
+    high = _num("regularMarketDayHigh", "dayHigh", "high")
+    low = _num("regularMarketDayLow", "dayLow", "low")
+    prev_close = _num("regularMarketPreviousClose", "previousClose", "prevClose")
+    volume = _num("regularMarketVolume", "volume")
+
     return normalize_market_data(
         symbol=symbol,
         spot=spot,
         timestamp_utc=timestamp_utc,
         session=session,
         source=STEADY_SOURCE_MAP[source],
+        high=high,
+        low=low,
+        prev_close=prev_close,
+        volume=volume,
     )

@@ -3,7 +3,7 @@
   "mode": "SIM",
   "symbol": "SPY",
 
-  "indicator_assertion_hash": "adfd720d6e725b4eb70aa88fd7f3ff080c537a07d0f3a0fbca1827ac38f7bb6b",
+  "indicator_assertion_hash": "9f5f979fe2f265938112f66c7f4d83575361f08e585005ab52c1f8c09e3fbe68",
 
   "intent": {
     "action": "BUY",
@@ -26,7 +26,7 @@
   },
 
   "engine_versions": {
-    "signal": "PHASE28_SIGNAL_EXISTENCE",
+    "signal": "PHASE28_SIGNAL_EXISTENCE_V3",
     "sizing": "PHASE34_47_POSITION_SIZING_V2",
     "balance": "PHASE47_BALANCE_AUTHORITY_V1"
   }

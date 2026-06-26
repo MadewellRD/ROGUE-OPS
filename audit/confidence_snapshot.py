@@ -5,9 +5,9 @@ Strategy Confidence Snapshot (Observability Only)
 from typing import Dict
 import json
 import datetime as dt
-from pathlib import Path
+from governance.paths import data_dir, ensure_dir
 
-CONFIDENCE_LOG_PATH = Path("/opt/rogueops/data/strategy_confidence.jsonl")
+CONFIDENCE_FILENAME = "strategy_confidence.jsonl"
 
 
 def log_confidence_snapshot(
@@ -21,6 +21,6 @@ def log_confidence_snapshot(
         "confidence": confidence,
     }
 
-    CONFIDENCE_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with CONFIDENCE_LOG_PATH.open("a") as f:
+    log_path = ensure_dir(data_dir()) / CONFIDENCE_FILENAME
+    with log_path.open("a") as f:
         f.write(json.dumps(record) + "\n")

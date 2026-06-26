@@ -41,6 +41,10 @@ def normalize_market_data(
     timestamp_utc: dt.datetime,
     session: SessionType,
     source: SourceType,
+    high: float | None = None,
+    low: float | None = None,
+    prev_close: float | None = None,
+    volume: float | None = None,
 ) -> MarketSnapshot:
     """
     Normalize asserted market data into a canonical MarketSnapshot.
@@ -95,10 +99,18 @@ def normalize_market_data(
     # --------------------------------------------------
     # Emit canonical snapshot
     # --------------------------------------------------
+    # Optional OHLCV carried in meta (Phase 4 feed enrichment).
+    meta = {
+        k: float(v)
+        for k, v in {"high": high, "low": low, "prev_close": prev_close, "volume": volume}.items()
+        if v is not None
+    } or None
+
     return create_market_snapshot(
         symbol=symbol,
         spot=float(spot),
         timestamp_utc=timestamp_utc,
         session=session,
         source=source,
+        meta=meta,
     )

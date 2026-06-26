@@ -1,9 +1,17 @@
+import os
 import requests
 import time
 import json
 
 STEADYAPI_BASE_URL = "https://api.steadyapi.com"
-API_KEY = "1419|4zMZUQJfKk8Yac6zDkrzTlga3kQCURTy1MNXHBEY"
+
+# Provide the key via environment, never hardcode it:
+#   PowerShell:  $env:STEADYAPI_KEY = "your-key"
+#   bash:        export STEADYAPI_KEY="your-key"
+API_KEY = os.getenv("STEADYAPI_KEY")
+if not API_KEY:
+    raise SystemExit("STEADYAPI_KEY is not set in the environment")
+
 SYMBOL = "SPY,IWM,QQQ,^VIX"
 
 headers = {

@@ -25,20 +25,24 @@ from pathlib import Path
 # CONFIG
 # ==================================================
 
-# JSON file containing environment defaults
-BOOTSTRAP_PATH = Path(
-    os.getenv(
-        "ROGUE_BOOTSTRAP_JSON",
-        "/opt/rogueops/rogue-ops-bootstrap.json",
-    )
-)
+# JSON file containing environment defaults (cross-platform path)
+from governance.paths import bootstrap_path
 
-REQUIRED_KEYS = [
+# Keys required only when running a broker/cloud-backed mode.
+# SIM and REPLAY are fully self-contained and require none of these.
+_CLOUD_REQUIRED_KEYS = [
     "IBKR_ACCOUNT_ID",
     "GCP_PROJECT_ID",
     "DOCTRINE_BUCKET",
     "GOOGLE_APPLICATION_CREDENTIALS",
 ]
+
+
+def _required_keys() -> list:
+    execution_mode = os.getenv("EXECUTION_MODE", "SIM")
+    ops_mode = os.getenv("OPS_MODE", "")
+    sim_like = execution_mode == "SIM" or ops_mode in ("SIM", "REPLAY")
+    return [] if sim_like else _CLOUD_REQUIRED_KEYS
 
 
 # ==================================================
@@ -55,17 +59,18 @@ def bootstrap_environment() -> None:
 
     data = {}
 
-    if BOOTSTRAP_PATH.exists():
+    path = bootstrap_path()
+    if path.exists():
         try:
-            data = json.loads(BOOTSTRAP_PATH.read_text())
+            data = json.loads(path.read_text())
         except Exception as e:
             raise RuntimeError(
-                f"BOOTSTRAP_JSON_INVALID:{BOOTSTRAP_PATH}:{e}"
+                f"BOOTSTRAP_JSON_INVALID:{path}:{e}"
             )
 
     missing = []
 
-    for key in REQUIRED_KEYS:
+    for key in _required_keys():
         if os.getenv(key):
             continue
 

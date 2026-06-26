@@ -1,139 +1,165 @@
 #
 # market_loop.py
 #
-# Market Autonomy Loop
-# PHASE 7 — MARKET HOST (LAW-AWARE, NO EXECUTION AUTHORITY)
+# Market Autonomy Loop — SignalEngine path
+#
+# Drives the verified execution spine on live/paper market data:
+#   market snapshot -> indicators -> SignalEngine -> StateMachine -> execution
+# with exit supremacy (open positions are managed/exited before new entries).
+#
+# This loop has NO strategy/council/arbitration dependency: per the Phase 3
+# decision, the SignalEngine path is the single live decision path. The loop
+# itself has no execution authority — the StateMachine authorizes and the
+# execution driver executes.
 #
 
 import time
-import datetime as dt
 from typing import Optional
 
 from ops_config import OPSConfig
 from governance.kill_switch import kill_active, engage_kill
 
 from market.market_data_adapter_steady import get_market_snapshot
-from market.types.market_snapshot import MarketSnapshot
-
 from advisory.indicator_authority import IndicatorAssertion
 from advisory.indicator_engine import IndicatorEngine
+from advisory.signal_engine import SignalEngine
 
-from strategy.registry import StrategyRegistry
-from strategy.council.council_engine import StrategyCouncilEngine
-
-from arbitration.arbitration_engine import DeterministicArbitrationEngine
-from execution.intent_router import IntentRouter
-from execution.state_machine import StateMachineV2
-
-from audit.strategy_audit_log import log_market_snapshot
+from execution.state_machine import StateMachineV2, SystemState
+from execution.execution_driver import execute_and_apply
+from execution.position_store import get_position_store
 
 
 # ==================================================
-# MARKET LOOP (HOST ONLY)
+# Single decision cycle (extracted for testability)
+# ==================================================
+
+def market_step(
+    *,
+    snapshot,
+    indicators: IndicatorAssertion,
+    signal_engine: SignalEngine,
+    state_machine: StateMachineV2,
+    positions,
+    account_id: str,
+    execution_mode: str,
+) -> str:
+    """
+    Run one decision cycle against a snapshot + indicators.
+
+    Returns a short status: EXIT | HOLD | ENTRY | ENTRY_DENIED | ENTRY_FAILED | NO_SIGNAL.
+    No network, no sleep — safe to drive directly from tests.
+    """
+
+    # --------------------------------------------------
+    # EXIT SUPREMACY — manage an open position first.
+    # --------------------------------------------------
+    if positions.has_open_position():
+        if state_machine.state == SystemState.MANAGING_POSITION:
+            exit_env = state_machine.manage_position(
+                snapshot=snapshot,
+                indicators=indicators.required,
+                execution_mode=execution_mode,
+            )
+            if exit_env is not None:
+                execute_and_apply(
+                    envelope=exit_env,
+                    state_machine=state_machine,
+                    account_id=account_id,
+                )
+                return "EXIT"
+        return "HOLD"
+
+    # --------------------------------------------------
+    # ENTRY — only when flat.
+    # --------------------------------------------------
+    result = signal_engine.evaluate(snapshot=snapshot, indicators=indicators)
+    if result is None:
+        return "NO_SIGNAL"
+
+    intent, _context = result
+
+    try:
+        entry_env = state_machine.authorize_entry(
+            intent=intent,
+            snapshot=snapshot,
+            execution_mode=execution_mode,
+        )
+    except Exception as e:
+        print(f"[MARKET LOOP] entry not authorized: {e}")
+        return "ENTRY_DENIED"
+
+    ok = execute_and_apply(
+        envelope=entry_env,
+        state_machine=state_machine,
+        account_id=account_id,
+    )
+    return "ENTRY" if ok else "ENTRY_FAILED"
+
+
+# ==================================================
+# MARKET LOOP (HOST)
 # ==================================================
 
 def run_market_loop(
     *,
     ops_config: OPSConfig,
     steady_api_key: str,
-    strategy_registry: StrategyRegistry,
+    strategy_registry=None,   # retained for call-site compatibility (unused)
     primary_symbol: Optional[str],
     state_machine: StateMachineV2,
     account_id: str,
 ) -> None:
     """
-    Market runtime host.
-
-    Responsibilities:
-    - Acquire market data
-    - Build immutable MarketSnapshot
-    - Invoke council + arbitration
-    - Route intents through LAW
-
-    This loop has NO execution authority.
+    Market runtime host. Acquires data, computes indicators, and runs one
+    market_step per cycle. Kill-dominant.
     """
 
     indicator_engine = IndicatorEngine()
-    council_engine = StrategyCouncilEngine(registry=strategy_registry)
-    arbitration_engine = DeterministicArbitrationEngine()
+    signal_engine = SignalEngine()
+    positions = get_position_store()
+    symbol = primary_symbol or "SPY"
+    execution_mode = ops_config.mode
 
-    router = IntentRouter(
-        state_machine=state_machine,
-        account_id=account_id,
-        execution_mode=ops_config.mode,
-    )
-
+    print("\n--- ROGUE MARKET RUNTIME STARTED (SignalEngine path) ---")
     iteration = 0
-
-    print("\n--- ROGUE MARKET RUNTIME STARTED (PHASE 7) ---")
 
     try:
         while True:
             if kill_active():
+                print("[MARKET LOOP] Kill active — exiting.")
                 return
 
             iteration += 1
-            now = dt.datetime.now(dt.timezone.utc)
 
-            # ----------------------------------
-            # HEARTBEAT (LIVENESS)
-            # ----------------------------------
-            print(
-                f"[HEARTBEAT][PHASE7] "
-                f"iter={iteration} "
-                f"ts={now.isoformat()}"
-            )
-
-            # ----------------------------------
-            # MARKET SNAPSHOT
-            # ----------------------------------
-            raw = get_market_snapshot(
-                symbol=primary_symbol,
-                source=ops_config.mode,
+            snapshot = get_market_snapshot(
+                symbol=symbol,
+                source=execution_mode,
                 api_key=steady_api_key,
             )
 
-            snapshot = MarketSnapshot(
-                snapshot_id=f"{primary_symbol}-{now.isoformat()}",
-                timestamp_utc=now,
-                session=raw.session,
-                primary_symbol=primary_symbol,
-                spot=raw.spot,
-                raw_primary=raw,
-            )
-
-            log_market_snapshot(snapshot)
-
-            # ----------------------------------
-            # INDICATORS (AUTHORITATIVE)
-            # ----------------------------------
-            indicator_assertion = indicator_engine.update(raw)
-            if not isinstance(indicator_assertion, IndicatorAssertion):
-                engage_kill(reason="Indicator authority violation")
+            indicators = indicator_engine.update(snapshot)
+            if not isinstance(indicators, IndicatorAssertion):
+                engage_kill(reason="INDICATOR_AUTHORITY_VIOLATION")
                 return
 
-            # ----------------------------------
-            # STRATEGY COUNCIL (PHASE 4)
-            # ----------------------------------
-            council_result = council_engine.evaluate(
-                snapshot=snapshot
-            )
-
-            # ----------------------------------
-            # ARBITRATION (PHASE 5)
-            # ----------------------------------
-            arbitration_result = arbitration_engine.arbitrate(
-                council_result=council_result
-            )
-
-            # ----------------------------------
-            # ROUTING (PHASE 7)
-            # ----------------------------------
-            router.route(
-                arbitration_result=arbitration_result,
+            status = market_step(
                 snapshot=snapshot,
+                indicators=indicators,
+                signal_engine=signal_engine,
+                state_machine=state_machine,
+                positions=positions,
+                account_id=account_id,
+                execution_mode=execution_mode,
             )
 
+            # Surface live state to the operator terminal (best-effort).
+            try:
+                from api.terminal_state import publish_frame
+                publish_frame(snapshot=snapshot, indicators=indicators, signal_status=status)
+            except Exception:
+                pass
+
+            print(f"[HEARTBEAT] iter={iteration} status={status} spot={snapshot.spot}")
             time.sleep(1)
 
     except (KeyboardInterrupt, SystemExit):
