@@ -12,10 +12,11 @@
 import os
 import sys
 import time
+from pathlib import Path
 
 # --- HARD REQUIREMENT ---
-# Ensure project root is on sys.path
-PROJECT_ROOT = "/opt/rogueops"
+# Ensure the repo root is on sys.path (cross-platform; derived from this file).
+PROJECT_ROOT = str(Path(__file__).resolve().parents[1])
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
