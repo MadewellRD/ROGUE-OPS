@@ -23,6 +23,7 @@ DEFAULT_TESTS = [
     "test_market_loop",
     "test_safety_governor",
     "test_fill_pnl",
+    "test_massive_client",
     "run_sim_regression",
 ]
 

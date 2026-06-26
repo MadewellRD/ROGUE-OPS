@@ -44,4 +44,6 @@ htmlcov/
 .rogueops/
 .rogueops_test/
 rh_token*
+.massive_key
+massive_key*
 *.bak
