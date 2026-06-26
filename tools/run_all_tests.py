@@ -26,6 +26,7 @@ DEFAULT_TESTS = [
     "test_massive_client",
     "test_backtest",
     "test_strategies",
+    "test_intraday",
     "run_sim_regression",
 ]
 

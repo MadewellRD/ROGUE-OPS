@@ -96,3 +96,35 @@ CANDIDATES: List[Strategy] = [
 ]
 
 STRATEGIES: Dict[str, Strategy] = {s.name: s for s in CANDIDATES}
+
+
+# ==================================================
+# Intraday-native strategies (use session features from research.intraday:
+# above_OR, VWAP_dist). Stateless per bar, fail-closed.
+# ==================================================
+
+def _orb_entry(req, passed):
+    return bool(req.get("above_OR"))
+
+
+def _orb_exit(req):
+    vd = _num(req, "VWAP_dist")
+    return True if vd is None else vd < 0          # exit once back below session VWAP
+
+
+def _vwap_revert_entry(req, passed):
+    vd = _num(req, "VWAP_dist")
+    return vd is not None and vd < -0.003          # ~0.3% below session VWAP
+
+
+def _vwap_revert_exit(req):
+    vd = _num(req, "VWAP_dist")
+    return True if vd is None else vd >= 0.0        # exit back to VWAP
+
+
+INTRADAY_CANDIDATES: List[Strategy] = [
+    Strategy("orb_long", _orb_entry, _orb_exit, "break opening-range high; exit below session VWAP"),
+    Strategy("vwap_revert", _vwap_revert_entry, _vwap_revert_exit, "long ~0.3% below session VWAP; exit back to VWAP"),
+    STRATEGIES["trend_follow"],
+    STRATEGIES["macd_momentum"],
+]
