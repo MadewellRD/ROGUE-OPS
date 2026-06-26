@@ -25,6 +25,7 @@ DEFAULT_TESTS = [
     "test_fill_pnl",
     "test_massive_client",
     "test_backtest",
+    "test_strategies",
     "run_sim_regression",
 ]
 
