@@ -39,3 +39,9 @@ htmlcov/
 
 # Shell history
 .bash_history
+
+# ROGUE:OPS runtime / local artifacts
+.rogueops/
+.rogueops_test/
+rh_token*
+*.bak
