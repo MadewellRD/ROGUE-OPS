@@ -47,6 +47,11 @@ def publish_frame(*, snapshot=None, indicators=None, signal_status: Optional[str
     _LAST_FRAME = frame
 
 
+def get_last_frame() -> Dict[str, Any]:
+    """The most recent market frame published by the live loop (or {})."""
+    return dict(_LAST_FRAME)
+
+
 def _safe(fn, default=None):
     try:
         return fn()

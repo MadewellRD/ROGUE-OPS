@@ -13,14 +13,19 @@
     --mono:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;
   }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--mono);font-size:13px;line-height:1.35}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--mono);font-size:13px;line-height:1.3;overflow:hidden}
   a{color:var(--cyan)}
-  .bar{display:flex;align-items:center;gap:14px;padding:8px 14px;background:linear-gradient(180deg,#0c141c,#080c11);
-       border-bottom:1px solid var(--border);position:sticky;top:0;z-index:5;flex-wrap:wrap}
+  .app{height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+  /* header (status folded in, no separate footer) */
+  .bar{flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:7px 14px;
+       background:linear-gradient(180deg,#0c141c,#080c11);border-bottom:1px solid var(--border);
+       flex-wrap:nowrap;overflow:hidden;white-space:nowrap}
   .brand{font-weight:700;color:var(--amber);letter-spacing:1px}
   .brand small{color:var(--dim);font-weight:400;letter-spacing:0}
   .spacer{flex:1}
-  .pill{padding:2px 8px;border:1px solid var(--border);border-radius:3px;color:var(--dim);white-space:nowrap}
+  .pill{padding:2px 8px;border:1px solid var(--border);border-radius:3px;color:var(--dim);white-space:nowrap;font-size:12px}
   .pill b{color:var(--text)}
   .kill-ok{color:var(--green);border-color:#15402a}
   .kill-on{color:var(--bg);background:var(--red);border-color:var(--red);font-weight:700}
@@ -29,247 +34,303 @@
        box-shadow:0 0 8px var(--green);animation:blink 1.4s infinite}
   .dot.demo{background:var(--warn);box-shadow:0 0 8px var(--warn)}
   @keyframes blink{50%{opacity:.35}}
+  .stat{color:var(--dim);font-size:11px}
+
   /* tabs */
-  .tabs{display:flex;gap:4px;padding:10px 14px 0}
-  .tab{padding:6px 18px;border:1px solid var(--border);border-bottom:none;border-radius:5px 5px 0 0;
+  .tabs{flex:0 0 auto;display:flex;gap:4px;padding:8px 14px 0;background:var(--bg)}
+  .tab{padding:5px 18px;border:1px solid var(--border);border-bottom:none;border-radius:5px 5px 0 0;
        background:var(--panel2);color:var(--dim);cursor:pointer;letter-spacing:1.5px;font-size:11px;text-transform:uppercase}
-  .tab.active{color:var(--amber);background:var(--panel);border-color:var(--amber);border-bottom:1px solid var(--panel)}
-  .view{display:none}.view.active{display:block}
-  /* grid + panels */
-  .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:10px;padding:12px}
-  .panel{background:var(--panel);border:1px solid var(--border);border-radius:5px;overflow:hidden}
-  .panel h2{margin:0;font-size:11px;letter-spacing:1.5px;color:var(--amber);text-transform:uppercase;
-            padding:7px 11px;background:var(--panel2);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
-  .panel .body{padding:11px}
+  .tab.active{color:var(--amber);background:var(--panel);border-color:var(--amber)}
+
+  /* stage / views fill the rest of the screen — no page scroll */
+  .stage{flex:1 1 auto;position:relative;min-height:0;overflow:hidden;border-top:1px solid var(--border)}
+  .view{position:absolute;inset:0;padding:10px;gap:10px;display:none;min-height:0}
+  .view.active{display:grid}
+  #view-live{grid-template-columns:repeat(12,1fr);grid-template-rows:1.32fr 1fr 0.62fr}
+  #view-research{grid-template-columns:repeat(12,1fr);grid-template-rows:auto 1.12fr 0.95fr}
+  #view-shadow{grid-template-columns:repeat(12,1fr);grid-template-rows:auto 1fr 1.5fr}
+
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:5px;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+  .panel h2{flex:0 0 auto;margin:0;font-size:11px;letter-spacing:1.2px;color:var(--amber);text-transform:uppercase;
+            padding:6px 11px;background:var(--panel2);border-bottom:1px solid var(--border);
+            display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .panel h2 .sub{color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .body{flex:1 1 auto;min-height:0;overflow:hidden;padding:10px;display:flex;flex-direction:column}
+  .body.scroll{overflow:auto}
   .col-3{grid-column:span 3}.col-4{grid-column:span 4}.col-5{grid-column:span 5}
   .col-6{grid-column:span 6}.col-7{grid-column:span 7}.col-8{grid-column:span 8}.col-9{grid-column:span 9}.col-12{grid-column:span 12}
-  @media(max-width:1100px){.col-3,.col-4,.col-5,.col-7,.col-8,.col-9{grid-column:span 6}}
-  @media(max-width:720px){.grid>*{grid-column:span 12!important}}
-  .kv{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px dotted #14202b}
+
+  .kv{display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px dotted #14202b}
   .kv:last-child{border-bottom:0}
   .kv .k{color:var(--dim)}
-  .big{font-size:30px;font-weight:700;letter-spacing:1px}
+  .big{font-size:26px;font-weight:700;letter-spacing:1px}
   .pos{color:var(--green)} .neg{color:var(--red)} .acc{color:var(--cyan)} .am{color:var(--amber)}
   .muted{color:var(--dim)}
-  .igrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-  .cell{background:var(--panel2);border:1px solid var(--border);border-radius:4px;padding:7px 9px}
+
+  /* chart wrapper: fills remaining panel height exactly */
+  .cw{flex:1 1 auto;min-height:0;position:relative;margin-top:6px}
+  .cw canvas{position:absolute!important;inset:0;width:100%!important;height:100%!important}
+
+  .igrid{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(2,1fr);gap:7px}
+  .cell{background:var(--panel2);border:1px solid var(--border);border-radius:4px;padding:6px 9px;display:flex;flex-direction:column;justify-content:center}
   .cell .lab{font-size:10px;color:var(--dim);letter-spacing:1px}
   .cell .val{font-size:15px;font-weight:700;margin-top:2px}
-  .sig{font-size:26px;font-weight:800;letter-spacing:2px;text-align:center;padding:14px 0}
-  .meter{height:10px;background:#14202b;border-radius:5px;overflow:hidden;margin:8px 0 4px}
+  .sig{flex:1 1 auto;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;letter-spacing:2px}
+  .meter{height:9px;background:#14202b;border-radius:5px;overflow:hidden;margin:7px 0 4px}
   .meter > i{display:block;height:100%;background:var(--green)}
   .tag{display:inline-block;font-size:10px;padding:1px 6px;border-radius:3px;border:1px solid var(--border);color:var(--dim)}
-  .tag.ok{color:var(--green);border-color:#15402a}.tag.no{color:var(--red);border-color:#3a1414}
-  .tag.warn{color:var(--warn);border-color:#4a3a12}
+  .tag.ok{color:var(--green);border-color:#15402a}.tag.no{color:var(--red);border-color:#3a1414}.tag.warn{color:var(--warn);border-color:#4a3a12}
+
   /* controls */
   .btn{font-family:var(--mono);font-size:11px;letter-spacing:1px;text-transform:uppercase;cursor:pointer;
-       padding:6px 12px;border-radius:4px;border:1px solid var(--border);background:var(--panel2);color:var(--text)}
+       padding:6px 12px;border-radius:4px;border:1px solid var(--border);background:var(--panel2);color:var(--text);white-space:nowrap}
   .btn:hover{border-color:var(--cyan)}
   .btn:disabled{opacity:.4;cursor:not-allowed}
   .btn.kill{background:var(--red);border-color:var(--red);color:#180405;font-weight:700}
   .btn.kill:hover{filter:brightness(1.12)}
   .btn.go{border-color:#15402a;color:var(--green)}
   .btn.armed{background:var(--amber);border-color:var(--amber);color:#1a1200;font-weight:700}
-  .btn.sm{padding:3px 9px;font-size:10px}
+  .btn.hsm{padding:4px 12px;font-size:11px}
+  .ctlrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .ctlnote{color:var(--dim);font-size:10.5px;flex:1 1 240px;min-width:160px;line-height:1.25}
   .field{display:flex;flex-direction:column;gap:3px}
   .field label{font-size:10px;color:var(--dim);letter-spacing:1px}
-  input,select{font-family:var(--mono);font-size:12px;background:var(--panel2);color:var(--text);
-       border:1px solid var(--border);border-radius:4px;padding:5px 7px}
+  input,select{font-family:var(--mono);font-size:12px;background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:5px 7px}
   .row{display:flex;gap:12px;flex-wrap:wrap;align-items:end}
-  .note{font-size:11px;color:var(--dim);margin-top:8px}
+
   /* tables */
   .tbl{width:100%;border-collapse:collapse;font-size:12px}
-  .tbl th{text-align:right;color:var(--dim);font-weight:400;padding:5px 8px;border-bottom:1px solid var(--border);letter-spacing:1px;font-size:10px;text-transform:uppercase}
+  .tbl thead th{position:sticky;top:0;background:var(--panel2);z-index:1}
+  .tbl th{text-align:right;color:var(--dim);font-weight:400;padding:5px 8px;border-bottom:1px solid var(--border);letter-spacing:.5px;font-size:10px;text-transform:uppercase}
   .tbl th:first-child,.tbl td:first-child{text-align:left}
-  .tbl td{text-align:right;padding:5px 8px;border-bottom:1px dotted #14202b}
+  .tbl td{text-align:right;padding:4px 8px;border-bottom:1px dotted #14202b}
   .tbl tbody tr{cursor:pointer}
   .tbl tbody tr:hover td{background:#0c151c}
   .tbl tr.sel td{background:#0e1a22;color:var(--text)}
-  .scroll{max-height:260px;overflow:auto}
-  .foot{padding:6px 14px;color:var(--dim);border-top:1px solid var(--border);display:flex;gap:16px;flex-wrap:wrap}
-  canvas{width:100%!important;height:150px!important}
-  canvas.research{height:250px!important}
 </style>
 </head>
 <body>
+<div class="app">
   <div class="bar">
     <div class="brand">ROGUE:OPS <small>// RETAIL OPTIONS GAMMA UTILITY ENGINE</small></div>
     <span class="pill" id="p-mode">EXEC <b>—</b></span>
     <span class="pill" id="p-session">SESSION <b>—</b></span>
     <div class="spacer"></div>
+    <span class="stat"><span class="dot" id="live-dot"></span><b id="src-label">…</b> · <span id="upd">—</span></span>
     <span class="pill" id="p-clock-et">ET —</span>
     <span class="pill" id="p-arm">ARM —</span>
     <span class="pill" id="p-kill">KILL —</span>
-    <button class="btn kill" id="hdr-kill">KILL</button>
+    <button class="btn kill hsm" id="hdr-kill">KILL</button>
   </div>
 
   <div class="tabs">
     <div class="tab active" data-view="live">Live</div>
     <div class="tab" data-view="research">Research</div>
+    <div class="tab" data-view="shadow">Shadow LLM</div>
   </div>
 
-  <!-- ============ LIVE ============ -->
-  <div class="view active" id="view-live">
-  <div class="grid">
-    <div class="panel col-5">
-      <h2>Market</h2>
-      <div class="body">
-        <div style="display:flex;align-items:baseline;gap:12px">
-          <span class="am" id="m-sym" style="font-size:16px;font-weight:700">—</span>
-          <span class="big acc" id="m-spot">—</span>
-          <span class="muted" id="m-src">—</span>
-        </div>
-        <canvas id="chart"></canvas>
-      </div>
-    </div>
-
-    <div class="panel col-7">
-      <h2>Indicators <span class="tag" id="i-pass">required —</span></h2>
-      <div class="body">
-        <div class="igrid">
-          <div class="cell"><div class="lab">VWAP</div><div class="val acc" id="i-vwap">—</div></div>
-          <div class="cell"><div class="lab">VWAP POS</div><div class="val" id="i-vpos">—</div></div>
-          <div class="cell"><div class="lab">ATR(14)</div><div class="val" id="i-atr">—</div></div>
-          <div class="cell"><div class="lab">MACD HIST</div><div class="val" id="i-macd">—</div></div>
-          <div class="cell"><div class="lab">RSI(7)</div><div class="val" id="i-rsi7">—</div></div>
-          <div class="cell"><div class="lab">RSI(14)</div><div class="val" id="i-rsi14">—</div></div>
-          <div class="cell"><div class="lab">EMA(9)</div><div class="val" id="i-ema9">—</div></div>
-          <div class="cell"><div class="lab">EMA(21)</div><div class="val" id="i-ema21">—</div></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="panel col-3">
-      <h2>Signal</h2>
-      <div class="body"><div class="sig muted" id="s-status">—</div>
-        <div class="kv"><span class="k">last cycle</span><span id="s-ts">—</span></div>
-      </div>
-    </div>
-
-    <div class="panel col-3">
-      <h2>Capital</h2>
-      <div class="body">
-        <div class="kv"><span class="k">Net Liq</span><span class="am" id="c-netliq">—</span></div>
-        <div class="kv"><span class="k">Buying Power</span><span id="c-bp">—</span></div>
-        <div class="kv"><span class="k">Available</span><span id="c-avail">—</span></div>
-        <div class="kv"><span class="k">Excess Liq</span><span id="c-excess">—</span></div>
-      </div>
-    </div>
-
-    <div class="panel col-3">
-      <h2>Risk · Daily Loss Governor</h2>
-      <div class="body">
-        <div class="kv"><span class="k">Realized P&L</span><span id="r-pnl">—</span></div>
-        <div class="kv"><span class="k">Max Daily Loss</span><span id="r-max">—</span></div>
-        <div class="meter"><i id="r-bar" style="width:0%"></i></div>
-        <div class="kv"><span class="k">State</span><span id="r-state">—</span></div>
-      </div>
-    </div>
-
-    <div class="panel col-3">
-      <h2>Position</h2>
-      <div class="body" id="pos-body">
-        <div class="big muted" id="pos-headline">FLAT</div>
-        <div id="pos-detail" class="muted" style="margin-top:6px">no open position</div>
-      </div>
-    </div>
-
-    <!-- CONTROLS -->
-    <div class="panel col-8">
-      <h2>Controls <span class="tag warn">localhost only</span></h2>
-      <div class="body">
-        <div class="row">
-          <button class="btn kill" id="ctl-kill">⛔ ENGAGE KILL</button>
-          <button class="btn" id="ctl-clear">CLEAR KILL FILE</button>
-          <button class="btn" id="ctl-arm">ARM CAPITAL (INTENT)</button>
-        </div>
-        <div class="note" id="ctl-msg">
-          Kill is real and cross-process — it writes the durable kill file the live loop honors on its next check.
-          Clearing requires a process restart to actually resume. <b>ARM is intent only</b>: live capital still
-          passes through preflight, the capital gate, and the signed re-cert — arming here cannot by itself place a
-          real-money order.
-        </div>
-      </div>
-    </div>
-
-    <div class="panel col-4">
-      <h2>Broker Routing</h2>
-      <div class="body">
-        <div class="kv"><span class="k">Options</span><span class="acc" id="b-opt">—</span></div>
-        <div class="kv"><span class="k">Equities</span><span class="acc" id="b-eq">—</span></div>
-        <div class="kv"><span class="k">Guard</span><span class="tag ok">FAIL-CLOSED</span></div>
-        <div class="muted" style="margin-top:6px;font-size:11px">options never route to an equities-only broker</div>
-      </div>
-    </div>
-  </div>
-  </div>
-
-  <!-- ============ RESEARCH ============ -->
-  <div class="view" id="view-research">
-  <div class="grid">
-    <div class="panel col-12">
-      <h2>Backtest Harness <span class="tag" id="rs-status">idle</span></h2>
-      <div class="body">
-        <div class="row">
-          <div class="field"><label>SYMBOL</label><input id="f-sym" value="SPY" size="6" /></div>
-          <div class="field"><label>SOURCE</label>
-            <select id="f-src">
-              <option value="massive_daily">Massive · daily</option>
-              <option value="ibkr_intraday">IBKR · intraday (needs TWS)</option>
-            </select>
+  <div class="stage">
+    <!-- ============ LIVE ============ -->
+    <div class="view active" id="view-live">
+      <div class="panel col-5">
+        <h2>Market <span class="sub" id="m-src">—</span></h2>
+        <div class="body">
+          <div style="display:flex;align-items:baseline;gap:12px;flex:0 0 auto">
+            <span class="am" id="m-sym" style="font-size:15px;font-weight:700">—</span>
+            <span class="big acc" id="m-spot">—</span>
           </div>
-          <div class="field"><label>LOOKBACK (D)</label><input id="f-days" value="250" size="5" /></div>
-          <div class="field"><label>BAR (intraday)</label>
-            <select id="f-bar"><option>5 mins</option><option>1 min</option><option>15 mins</option><option>30 mins</option></select>
-          </div>
-          <div class="field"><label>COST (bps rt)</label><input id="f-cost" value="2" size="4" /></div>
-          <div class="field"><label>&nbsp;</label><button class="btn go" id="f-run">▶ RUN BACKTEST</button></div>
+          <div class="cw"><canvas id="chart"></canvas></div>
         </div>
-        <div class="note" id="rs-meta">Underlying-return proxy net of cost — directional signal quality, not option P&L. See EDGE_ROADMAP.md.</div>
+      </div>
+
+      <div class="panel col-7">
+        <h2>Indicators <span class="tag" id="i-pass">required —</span></h2>
+        <div class="body">
+          <div class="igrid">
+            <div class="cell"><div class="lab">VWAP</div><div class="val acc" id="i-vwap">—</div></div>
+            <div class="cell"><div class="lab">VWAP POS</div><div class="val" id="i-vpos">—</div></div>
+            <div class="cell"><div class="lab">ATR(14)</div><div class="val" id="i-atr">—</div></div>
+            <div class="cell"><div class="lab">MACD HIST</div><div class="val" id="i-macd">—</div></div>
+            <div class="cell"><div class="lab">RSI(7)</div><div class="val" id="i-rsi7">—</div></div>
+            <div class="cell"><div class="lab">RSI(14)</div><div class="val" id="i-rsi14">—</div></div>
+            <div class="cell"><div class="lab">EMA(9)</div><div class="val" id="i-ema9">—</div></div>
+            <div class="cell"><div class="lab">EMA(21)</div><div class="val" id="i-ema21">—</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel col-3">
+        <h2>Signal</h2>
+        <div class="body">
+          <div class="sig muted" id="s-status">—</div>
+          <div class="kv" style="flex:0 0 auto"><span class="k">last cycle</span><span id="s-ts">—</span></div>
+        </div>
+      </div>
+
+      <div class="panel col-3">
+        <h2>Capital</h2>
+        <div class="body">
+          <div class="kv"><span class="k">Net Liq</span><span class="am" id="c-netliq">—</span></div>
+          <div class="kv"><span class="k">Buying Power</span><span id="c-bp">—</span></div>
+          <div class="kv"><span class="k">Available</span><span id="c-avail">—</span></div>
+          <div class="kv"><span class="k">Excess Liq</span><span id="c-excess">—</span></div>
+        </div>
+      </div>
+
+      <div class="panel col-3">
+        <h2>Risk · Daily Loss</h2>
+        <div class="body">
+          <div class="kv"><span class="k">Realized P&L</span><span id="r-pnl">—</span></div>
+          <div class="kv"><span class="k">Max Daily Loss</span><span id="r-max">—</span></div>
+          <div class="meter" style="flex:0 0 auto"><i id="r-bar" style="width:0%"></i></div>
+          <div class="kv"><span class="k">State</span><span id="r-state">—</span></div>
+        </div>
+      </div>
+
+      <div class="panel col-3">
+        <h2>Position</h2>
+        <div class="body">
+          <div class="big muted" id="pos-headline" style="flex:0 0 auto">FLAT</div>
+          <div id="pos-detail" class="muted" style="margin-top:4px">no open position</div>
+        </div>
+      </div>
+
+      <div class="panel col-8">
+        <h2>Controls <span class="sub">localhost only · kill is real &amp; cross-process · arm is intent, still gated by preflight + re-cert</span></h2>
+        <div class="body">
+          <div class="ctlrow">
+            <button class="btn kill" id="ctl-kill">⛔ ENGAGE KILL</button>
+            <button class="btn" id="ctl-clear">CLEAR KILL FILE</button>
+            <button class="btn" id="ctl-arm">ARM CAPITAL (INTENT)</button>
+            <span class="ctlnote" id="ctl-msg">Kill writes the durable flag the live loop honors on its next check; clearing needs a restart to resume. Arming alone cannot place a real-money order.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel col-4">
+        <h2>Broker Routing</h2>
+        <div class="body">
+          <div class="kv"><span class="k">Options</span><span class="acc" id="b-opt">—</span></div>
+          <div class="kv"><span class="k">Equities</span><span class="acc" id="b-eq">—</span></div>
+          <div class="kv"><span class="k">Guard</span><span class="tag ok">FAIL-CLOSED</span></div>
+        </div>
       </div>
     </div>
 
-    <div class="panel col-12">
-      <h2>Strategies <span class="muted" id="rs-rank">ranked by out-of-sample cumulative</span></h2>
-      <div class="body" style="padding:0">
-        <table class="tbl">
-          <thead><tr>
-            <th>Strategy</th><th>Trades</th><th>Win%</th><th>Exp%</th><th>Cum%</th>
-            <th>MaxDD%</th><th>Sharpe/tr</th><th>OOS Cum%</th><th>OOS Tr</th>
-          </tr></thead>
-          <tbody id="rs-rows"><tr><td colspan="9" class="muted" style="padding:14px">Run a backtest to populate.</td></tr></tbody>
-        </table>
+    <!-- ============ RESEARCH ============ -->
+    <div class="view" id="view-research">
+      <div class="panel col-12">
+        <h2>Backtest Harness <span class="tag" id="rs-status">idle</span></h2>
+        <div class="body" style="overflow:visible">
+          <div class="row">
+            <div class="field"><label>SYMBOL</label><input id="f-sym" value="SPY" size="6" /></div>
+            <div class="field"><label>SOURCE</label>
+              <select id="f-src">
+                <option value="massive_daily">Massive · daily</option>
+                <option value="ibkr_intraday">IBKR · intraday (needs TWS)</option>
+              </select>
+            </div>
+            <div class="field"><label>LOOKBACK (D)</label><input id="f-days" value="250" size="5" /></div>
+            <div class="field"><label>BAR (intraday)</label>
+              <select id="f-bar"><option>5 mins</option><option>1 min</option><option>15 mins</option><option>30 mins</option></select>
+            </div>
+            <div class="field"><label>COST (bps rt)</label><input id="f-cost" value="2" size="4" /></div>
+            <div class="field"><label>&nbsp;</label><button class="btn go" id="f-run">▶ RUN BACKTEST</button></div>
+            <div class="field" style="flex:1 1 200px"><label>&nbsp;</label><span class="muted" id="rs-meta" style="font-size:10.5px">Underlying-return proxy net of cost — directional signal quality, not option P&L.</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel col-6">
+        <h2>Strategies <span class="sub">ranked by out-of-sample cumulative</span></h2>
+        <div class="body scroll" style="padding:0">
+          <table class="tbl">
+            <thead><tr>
+              <th>Strategy</th><th>Tr</th><th>Win%</th><th>Exp%</th><th>Cum%</th><th>DD%</th><th>Shp</th><th>OOS%</th><th>OOSt</th>
+            </tr></thead>
+            <tbody id="rs-rows"><tr><td colspan="9" class="muted" style="padding:14px">Run a backtest to populate.</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel col-6">
+        <h2>Price &amp; Entries/Exits <span class="sub" id="rs-px-name">—</span></h2>
+        <div class="body"><div class="cw" style="margin-top:0"><canvas id="px-chart"></canvas></div></div>
+      </div>
+
+      <div class="panel col-6">
+        <h2>Equity Curve <span class="sub" id="rs-eq-name">—</span></h2>
+        <div class="body"><div class="cw" style="margin-top:0"><canvas id="eq-chart"></canvas></div></div>
+      </div>
+
+      <div class="panel col-6">
+        <h2>Trade Blotter <span class="sub" id="rs-bl-name">—</span></h2>
+        <div class="body scroll" style="padding:0">
+          <table class="tbl">
+            <thead><tr><th>#</th><th>Entry</th><th>In</th><th>Exit</th><th>Out</th><th>Bars</th><th>Ret%</th><th>Open</th></tr></thead>
+            <tbody id="bl-rows"><tr><td colspan="8" class="muted" style="padding:14px">—</td></tr></tbody>
+          </table>
+        </div>
       </div>
     </div>
 
-    <div class="panel col-6">
-      <h2>Equity Curve <span class="muted" id="rs-eq-name">—</span></h2>
-      <div class="body"><canvas id="eq-chart" class="research"></canvas></div>
-    </div>
+    <!-- ============ SHADOW LLM ============ -->
+    <div class="view" id="view-shadow">
+      <div class="panel col-12">
+        <h2>Shadow LLM Advisor <span class="sub">logged only · never trades · model sees price + indicators, not the engine's call</span></h2>
+        <div class="body">
+          <div class="ctlrow">
+            <button class="btn go" id="sh-read">◐ GET SHADOW READ</button>
+            <button class="btn" id="sh-refresh">REFRESH LEDGER</button>
+            <span class="pill" id="sh-status">OLLAMA —</span>
+            <span class="pill" id="sh-model">MODEL —</span>
+            <span class="ctlnote">Independent skill, not parroting. Every read is logged side-by-side for later edge evaluation. This panel cannot place, size, or stop a trade.</span>
+          </div>
+        </div>
+      </div>
 
-    <div class="panel col-6">
-      <h2>Price &amp; Entries/Exits <span class="muted" id="rs-px-name">—</span></h2>
-      <div class="body"><canvas id="px-chart" class="research"></canvas></div>
-    </div>
+      <div class="panel col-6">
+        <h2>Latest Read</h2>
+        <div class="body">
+          <div style="display:flex;gap:24px;align-items:center;flex:0 0 auto">
+            <div style="text-align:center">
+              <div class="muted" style="font-size:10px;letter-spacing:1px">LLM BIAS</div>
+              <div class="big" id="sh-bias">—</div>
+              <div class="muted" id="sh-conf">conf —</div>
+            </div>
+            <div style="text-align:center">
+              <div class="muted" style="font-size:10px;letter-spacing:1px">DETERMINISTIC</div>
+              <div class="big acc" id="sh-det">—</div>
+              <div class="muted">engine of record</div>
+            </div>
+          </div>
+          <div class="muted" id="sh-rationale" style="margin-top:10px;flex:1 1 auto;overflow:auto;font-size:11.5px">—</div>
+          <div class="kv" style="flex:0 0 auto"><span class="k">model · latency</span><span id="sh-meta">—</span></div>
+        </div>
+      </div>
 
-    <div class="panel col-12">
-      <h2>Trade Blotter <span class="muted" id="rs-bl-name">—</span></h2>
-      <div class="body scroll" style="padding:0">
-        <table class="tbl">
-          <thead><tr><th>#</th><th>Entry Date</th><th>Entry</th><th>Exit Date</th><th>Exit</th><th>Bars</th><th>Return%</th><th>Open?</th></tr></thead>
-          <tbody id="bl-rows"><tr><td colspan="8" class="muted" style="padding:14px">—</td></tr></tbody>
-        </table>
+      <div class="panel col-6">
+        <h2>Agreement <span class="sub">this session's ledger</span></h2>
+        <div class="body">
+          <div class="kv"><span class="k">Reads logged</span><span id="sh-n">—</span></div>
+          <div class="kv"><span class="k">LLM directional (non-FLAT)</span><span id="sh-cov">—</span></div>
+          <div class="kv"><span class="k">Agree w/ engine eligibility</span><span id="sh-agree">—</span></div>
+          <div class="muted" style="margin-top:8px;font-size:10.5px">Forward-return hit-rate needs the offline backtest (tools\shadow_backtest.py) — this panel tracks live reads.</div>
+        </div>
+      </div>
+
+      <div class="panel col-12">
+        <h2>Shadow Ledger <span class="sub">side-by-side, most recent last</span></h2>
+        <div class="body scroll" style="padding:0">
+          <table class="tbl">
+            <thead><tr><th>Time (UTC)</th><th>Spot</th><th>Engine</th><th>LLM Bias</th><th>Conf</th><th>Rationale</th><th>ms</th></tr></thead>
+            <tbody id="sh-rows"><tr><td colspan="7" class="muted" style="padding:14px">No reads yet. Start the loop (main.py) so frames publish, then “Get shadow read”.</td></tr></tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
-  </div>
-
-  <div class="foot">
-    <span><span class="dot" id="live-dot"></span><b id="src-label">CONNECTING…</b></span>
-    <span>updated <b id="upd">—</b></span>
-    <span>localhost:8787</span>
-    <span class="muted">ROGUE:OPS operator console</span>
-  </div>
+</div>
 
 <script>
 (function(){
@@ -286,7 +347,9 @@
     document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
     t.classList.add('active');
     $('view-'+t.dataset.view).classList.add('active');
-    if(t.dataset.view==='research'){ if(eqChart) eqChart.resize(); if(pxChart) pxChart.resize(); }
+    if(t.dataset.view==='research'){ setTimeout(()=>{ if(eqChart) eqChart.resize(); if(pxChart) pxChart.resize(); },30); }
+    else if(t.dataset.view==='shadow'){ shStatus(); shLedger(); }
+    else { setTimeout(()=>chart.resize(),30); }
   });
 
   // ---------- live chart ----------
@@ -324,24 +387,24 @@
   function sigClass(s){return s==='ENTRY'?'pos':(s==='EXIT'||s==='ENTRY_DENIED'||s==='ENTRY_FAILED')?'neg':(s==='HOLD')?'acc':'muted';}
 
   function render(st, demo){
-    $('src-label').textContent = demo ? 'DEMO DATA (no /state — sample feed)' : 'LIVE';
+    $('src-label').textContent = demo ? 'DEMO' : 'LIVE';
     $('live-dot').className = 'dot' + (demo?' demo':'');
-    $('upd').textContent = (st.ts_utc||'').replace('T',' ');
+    $('upd').textContent = (st.ts_utc||'').substr(11,8) || '—';
     $('p-mode').innerHTML='EXEC <b>'+(st.mode||'—')+'</b>';
 
     const kill=st.kill||{}; const killed=!!kill.killed;
     const kp=$('p-kill'); kp.className='pill '+(killed?'kill-on':'kill-ok');
-    kp.innerHTML = killed ? ('KILL ACTIVE'+(kill.reason?(' · '+String(kill.reason).slice(0,24)):'')) : 'KILL CLEAR';
+    kp.innerHTML = killed ? ('KILL ACTIVE'+(kill.reason?(' · '+String(kill.reason).slice(0,20)):'')) : 'KILL CLEAR';
 
     const armed=!!(st.control&&st.control.armed);
-    const ap=$('p-arm'); ap.className='pill '+(armed?'arm-on':''); ap.innerHTML = armed?'ARM INTENT ON':'ARM OFF';
+    const ap=$('p-arm'); ap.className='pill '+(armed?'arm-on':''); ap.innerHTML = armed?'ARM ON':'ARM OFF';
     const ab=$('ctl-arm'); ab.className='btn '+(armed?'armed':''); ab.textContent = armed?'DISARM CAPITAL':'ARM CAPITAL (INTENT)';
 
     const m=st.market||{};
     $('p-session').innerHTML='SESSION <b>'+(m.session||'—')+'</b>';
     $('m-sym').textContent=m.symbol||'—';
     $('m-spot').textContent=m.spot!=null?Number(m.spot).toFixed(2):'—';
-    $('m-src').textContent=m.source?('· '+m.source):'';
+    $('m-src').textContent=m.source?(m.source):'—';
 
     const ind=(m.indicators)||{};
     $('i-vwap').textContent=NUM(m.vwap);
@@ -382,8 +445,8 @@
       $('pos-detail').className='muted'; $('pos-detail').textContent='no open position'; }
 
     const b=st.brokers||{};
-    $('b-opt').textContent=(b.options||'IBKR')+'  ·  options';
-    $('b-eq').textContent=(b.equities||'ROBINHOOD')+'  ·  equities';
+    $('b-opt').textContent=(b.options||'IBKR');
+    $('b-eq').textContent=(b.equities||'ROBINHOOD');
 
     if(m.spot!=null){
       buf.push({s:Number(m.spot),v:(m.vwap!=null?Number(m.vwap):null)});
@@ -435,7 +498,7 @@
   function ensureCharts(){
     if(!eqChart) eqChart = mkChart('eq-chart',{type:'line',
       data:{labels:[],datasets:[{label:'equity',data:[],borderColor:'#2bff88',borderWidth:1.6,pointRadius:0,tension:.15}]},
-      options:{animation:false,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      options:{animation:false,responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
         scales:{x:{ticks:{color:'#5d6f7c',font:{size:9},maxTicksLimit:8}},y:{ticks:{color:'#5d6f7c',font:{size:9}},grid:{color:'#11202c'}}}}});
     if(!pxChart) pxChart = mkChart('px-chart',{type:'line',
       data:{labels:[],datasets:[
@@ -443,7 +506,7 @@
         {label:'entry',data:[],borderColor:'#2bff88',backgroundColor:'#2bff88',showLine:false,pointRadius:4,pointStyle:'triangle',order:1},
         {label:'exit',data:[],borderColor:'#ff4d4d',backgroundColor:'#ff4d4d',showLine:false,pointRadius:4,pointStyle:'rectRot',order:2}
       ]},
-      options:{animation:false,maintainAspectRatio:false,plugins:{legend:{display:true,labels:{color:'#5d6f7c',boxWidth:9,font:{size:9}}}},
+      options:{animation:false,responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,labels:{color:'#5d6f7c',boxWidth:9,font:{size:9}}}},
         scales:{x:{ticks:{color:'#5d6f7c',font:{size:9},maxTicksLimit:8}},y:{ticks:{color:'#5d6f7c',font:{size:9}},grid:{color:'#11202c'}}}}});
   }
 
@@ -510,7 +573,7 @@
       lastRes=res;
       $('rs-status').textContent='ok'; $('rs-status').className='tag ok';
       const sess=res.sessions!=null?`, ${res.sessions} sessions`:'';
-      $('rs-meta').textContent=`${res.symbol} · ${res.source} · ${res.bars} bars${sess} · cost ${res.params.cost_bps}bps rt — underlying-return proxy, not option P&L.`;
+      $('rs-meta').textContent=`${res.symbol} · ${res.source} · ${res.bars} bars${sess} · cost ${res.params.cost_bps}bps rt`;
       renderTable(res);
       if(res.strategies.length) select(0);
     }catch(e){ $('rs-status').textContent='error'; $('rs-status').className='tag no';
@@ -519,8 +582,64 @@
   }
   $('f-run').onclick=runResearch;
 
+  // ---------- shadow LLM ----------
+  function biasCls(b){return b==='LONG'?'pos':b==='SHORT'?'neg':'muted';}
+
+  async function shStatus(){
+    try{
+      const s=await (await fetch('/shadow/status',{cache:'no-store'})).json();
+      const sp=$('sh-status'); sp.className='pill '+(s.available?'kill-ok':'kill-on');
+      sp.innerHTML='OLLAMA '+(s.available?'UP':'DOWN');
+      $('sh-model').innerHTML='MODEL <b>'+(s.model||'—')+'</b>';
+    }catch(e){ $('sh-status').innerHTML='OLLAMA —'; }
+  }
+
+  async function shRead(){
+    $('sh-read').disabled=true; $('sh-read').textContent='reading…';
+    try{
+      const r=await (await fetch('/shadow',{cache:'no-store'})).json();
+      if(!r.ok && !r.read){ $('sh-rationale').innerHTML='<span class="neg">'+(r.error||'no read')+'</span>'; }
+      else{
+        const rd=r.read||{};
+        const be=$('sh-bias'); be.textContent=rd.bias||'—'; be.className='big '+biasCls(rd.bias);
+        $('sh-conf').textContent='conf '+(rd.confidence!=null?Number(rd.confidence).toFixed(2):'—');
+        $('sh-det').textContent=r.det_signal||'—';
+        $('sh-rationale').textContent=rd.rationale||'—';
+        $('sh-meta').textContent=(rd.model||'—')+' · '+(rd.latency_ms!=null?rd.latency_ms+'ms':'—');
+      }
+    }catch(e){ $('sh-rationale').innerHTML='<span class="neg">request failed</span>'; }
+    finally{ $('sh-read').disabled=false; $('sh-read').textContent='◐ GET SHADOW READ'; shLedger(); }
+  }
+
+  async function shLedger(){
+    try{
+      const j=await (await fetch('/shadow/ledger?limit=100',{cache:'no-store'})).json();
+      const rows=j.rows||[]; const tb=$('sh-rows');
+      if(!rows.length){ tb.innerHTML='<tr><td colspan="7" class="muted" style="padding:14px">No reads yet.</td></tr>'; }
+      else{
+        tb.innerHTML='';
+        rows.forEach(r=>{ const l=r.llm||{}; const tr=document.createElement('tr');
+          tr.innerHTML=`<td>${(r.ts_utc||'').substr(11,8)}</td><td>${r.spot!=null?Number(r.spot).toFixed(2):'—'}</td>`+
+            `<td class="acc">${r.det_signal||'—'}</td><td class="${biasCls(l.bias)}">${l.bias||'—'}</td>`+
+            `<td>${l.confidence!=null?Number(l.confidence).toFixed(2):'—'}</td>`+
+            `<td class="muted" style="text-align:left;max-width:340px">${(l.rationale||'').replace(/[<>]/g,'')}</td><td>${l.latency_ms!=null?l.latency_ms:'—'}</td>`;
+          tb.appendChild(tr); });
+        tb.parentElement.parentElement.scrollTop=99999;
+      }
+      // agreement stats
+      const n=rows.length, nf=rows.filter(r=>(r.llm||{}).bias && r.llm.bias!=='FLAT' && r.llm.bias!=='UNKNOWN').length;
+      const agree=rows.filter(r=>{const act=(r.llm||{}).bias && r.llm.bias!=='FLAT' && r.llm.bias!=='UNKNOWN'; return act===(r.det_passed===true);}).length;
+      $('sh-n').textContent=n||'—';
+      $('sh-cov').textContent=n?((nf/n*100).toFixed(0)+'% ('+nf+'/'+n+')'):'—';
+      $('sh-agree').textContent=n?((agree/n*100).toFixed(0)+'%'):'—';
+    }catch(e){}
+  }
+  $('sh-read').onclick=shRead;
+  $('sh-refresh').onclick=()=>{shStatus();shLedger();};
+
   clocks(); setInterval(clocks,1000);
   poll(); setInterval(poll,1000);
+  window.addEventListener('resize',()=>{ chart.resize(); if(eqChart)eqChart.resize(); if(pxChart)pxChart.resize(); });
 })();
 </script>
 </body>

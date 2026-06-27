@@ -30,6 +30,7 @@ DEFAULT_TESTS = [
     "test_strategies",
     "test_intraday",
     "test_console",
+    "test_shadow",
     "run_sim_regression",
 ]
 

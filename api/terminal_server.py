@@ -84,6 +84,16 @@ class _Handler(BaseHTTPRequestHandler):
             )
             self._json(result)
             return
+        if path == "/shadow":
+            self._json(control.shadow_now())
+            return
+        if path == "/shadow/ledger":
+            q = parse_qs(route.query)
+            self._json(control.shadow_ledger(_int(q.get("limit", ["100"])[0], 100)))
+            return
+        if path == "/shadow/status":
+            self._json(control.ollama_status())
+            return
         if path == "/legacy":
             self._html(LEGACY_HTML)
             return

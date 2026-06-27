@@ -194,6 +194,53 @@ def _trade_dict(t) -> Dict[str, Any]:
     }
 
 
+# ==================================================
+# Shadow LLM advisor (advisory-only, fail-soft)
+# ==================================================
+
+def ollama_status() -> Dict[str, Any]:
+    from advisory import llm_ollama
+    return {
+        "available": llm_ollama.available(),
+        "model": llm_ollama.default_model(),
+        "host": llm_ollama.host(),
+        "models": llm_ollama.list_models(),
+    }
+
+
+def shadow_now() -> Dict[str, Any]:
+    """Take the latest live market frame, ask the LLM for an INDEPENDENT read,
+    log it side-by-side with the deterministic signal, and return it. This never
+    touches execution; it only reads the published frame and writes the ledger."""
+    from api.terminal_state import get_last_frame
+    from advisory import shadow_advisor, llm_ollama
+
+    fr = get_last_frame()
+    if not fr or fr.get("spot") is None:
+        return {"ok": False, "error": "no live market frame yet — start the loop (main.py)",
+                "available": llm_ollama.available()}
+    req = fr.get("indicators") or {}
+    read = shadow_advisor.shadow_read(
+        fr.get("symbol", "SPY"), fr.get("spot"), fr.get("session", "REGULAR"), req, fr.get("vwap")
+    )
+    row = shadow_advisor.record(
+        read, symbol=fr.get("symbol", "SPY"), spot=fr.get("spot"), source=fr.get("source", "LIVE"),
+        det_signal=fr.get("signal_status"), det_passed=fr.get("required_passed"), req=req,
+    )
+    return {"ok": read.ok, "read": _asdict(read), "det_signal": fr.get("signal_status"),
+            "row": row, "available": True}
+
+
+def shadow_ledger(limit: int = 100) -> Dict[str, Any]:
+    from advisory import shadow_advisor
+    return {"ok": True, "rows": shadow_advisor.read_ledger(limit)}
+
+
+def _asdict(read) -> Dict[str, Any]:
+    from dataclasses import asdict
+    return asdict(read)
+
+
 def _now() -> str:
     return (
         dt.datetime.now(dt.timezone.utc)
