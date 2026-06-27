@@ -43,6 +43,7 @@ htmlcov/
 # ROGUE:OPS runtime / local artifacts
 .rogueops/
 .rogueops_test/
+.roguedata/
 rh_token*
 .massive_key
 massive_key*

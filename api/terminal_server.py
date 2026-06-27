@@ -145,8 +145,13 @@ def _float(v, default):
 
 
 def main() -> None:
-    print(f"ROGUE:OPS Console  ->  http://localhost:{PORT}   (Ctrl+C to stop)")
-    ThreadingHTTPServer(("127.0.0.1", PORT), _Handler).serve_forever()
+    # Bind host: 127.0.0.1 on bare metal (never exposed off-host). In a
+    # container set TERMINAL_BIND=0.0.0.0 and publish the port to the host's
+    # loopback only (compose maps 127.0.0.1:8787:8787), preserving the same
+    # localhost-only guarantee.
+    bind = os.getenv("TERMINAL_BIND", "127.0.0.1")
+    print(f"ROGUE:OPS Console  ->  http://localhost:{PORT}   (bind {bind}, Ctrl+C to stop)")
+    ThreadingHTTPServer((bind, PORT), _Handler).serve_forever()
 
 
 if __name__ == "__main__":

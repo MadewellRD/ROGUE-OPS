@@ -1,0 +1,62 @@
+# ROGUE:OPS — always-up console (and optional paper loop).
+#
+#   docker compose up -d --build        # start, rebuild
+#   docker compose logs -f console      # follow logs
+#   docker compose down                 # stop
+#
+# The console is published to the HOST LOOPBACK ONLY (127.0.0.1:8787) — never to
+# the LAN. State persists in ./.roguedata (kill file, shadow ledger, audit), so
+# an engaged kill SURVIVES restarts and is honored on boot. Put MASSIVE_API_KEY
+# (and any others) in a local .env file next to this one — never commit it.
+
+services:
+  console:
+    build: .
+    image: rogue-ops-console
+    container_name: rogue-console
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8787:8787"
+    environment:
+      - TERMINAL_BIND=0.0.0.0
+      - TERMINAL_PORT=8787
+      - ROGUE_OPS_HOME=/data
+      # Research over Massive (daily) — supply via .env, do not hard-code:
+      - MASSIVE_API_KEY=${MASSIVE_API_KEY:-}
+      # Shadow LLM reads use the host's Ollama:
+      - OLLAMA_HOST=http://host.docker.internal:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2}
+    volumes:
+      - ./.roguedata:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # reach host services (Ollama) from Linux engines
+
+  # ----------------------------------------------------------------------------
+  # PAPER trading loop — enable when you want the engine "live" on paper fills.
+  # Requirements (see DOCKER.md):
+  #   - IB Gateway (or TWS) running on the host, API enabled, paper port 7497,
+  #     and this container's address added to TWS "Trusted IPs".
+  #   - An image that includes the IBKR Python API (ibapi). The console image
+  #     above does NOT include it; build a paper image per DOCKER.md.
+  #   - There is no proven edge yet — keep this on PAPER, not real capital.
+  # ----------------------------------------------------------------------------
+  # loop:
+  #   build: { context: ., dockerfile: Dockerfile.paper }
+  #   container_name: rogue-loop
+  #   restart: unless-stopped
+  #   command: ["python", "main.py", "--mode", "PAPER"]
+  #   environment:
+  #     - EXECUTION_MODE=PAPER
+  #     - OPS_MODE=PAPER
+  #     - ROGUE_OPS_HOME=/data
+  #     - IBKR_HOST=host.docker.internal
+  #     - IBKR_PORT=7497
+  #     - IBKR_ACCOUNT_ID=${IBKR_ACCOUNT_ID:-}
+  #     - MASSIVE_API_KEY=${MASSIVE_API_KEY:-}
+  #     - OLLAMA_SHADOW=1
+  #     - OLLAMA_HOST=http://host.docker.internal:11434
+  #     - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2}
+  #   volumes:
+  #     - ./.roguedata:/data
+  #   extra_hosts:
+  #     - "host.docker.internal:host-gateway"

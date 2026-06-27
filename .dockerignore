@@ -1,0 +1,15 @@
+# Keep secrets and local state OUT of the image layers.
+.git
+.gitignore
+.github
+.roguedata
+.rogueops_test
+.massive_key
+massive_key*
+rh_token*
+.env
+**/__pycache__
+*.pyc
+*.bak
+DOCKER.md
+*.md
