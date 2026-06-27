@@ -32,6 +32,7 @@ DEFAULT_TESTS = [
     "test_console",
     "test_shadow",
     "test_shadow_runner",
+    "test_shadow_eval",
     "run_sim_regression",
 ]
 

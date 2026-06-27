@@ -312,10 +312,13 @@
       <div class="panel col-6">
         <h2>Agreement <span class="sub">this session's ledger</span></h2>
         <div class="body">
-          <div class="kv"><span class="k">Reads logged</span><span id="sh-n">—</span></div>
+          <div class="kv"><span class="k">Reads logged · paired</span><span id="sh-n">—</span></div>
           <div class="kv"><span class="k">LLM directional (non-FLAT)</span><span id="sh-cov">—</span></div>
-          <div class="kv"><span class="k">Agree w/ engine eligibility</span><span id="sh-agree">—</span></div>
-          <div class="muted" style="margin-top:8px;font-size:10.5px">Forward-return hit-rate needs the offline backtest (tools\shadow_backtest.py) — this panel tracks live reads.</div>
+          <div class="kv"><span class="k">LLM hit-rate (fwd)</span><span id="sh-hit">—</span></div>
+          <div class="kv"><span class="k">Engine hit-rate (fwd)</span><span id="sh-dethit">—</span></div>
+          <div class="kv"><span class="k">LLM dir-PnL proxy</span><span id="sh-pnl">—</span></div>
+          <div class="kv"><span class="k">Agree w/ engine</span><span id="sh-agree">—</span></div>
+          <div class="muted" style="margin-top:8px;font-size:10.5px">Forward move = next read's spot (pairs &le; 30 min apart). Direction only, no costs — evidence, not a verdict.</div>
         </div>
       </div>
 
@@ -626,12 +629,23 @@
           tb.appendChild(tr); });
         tb.parentElement.parentElement.scrollTop=99999;
       }
-      // agreement stats
-      const n=rows.length, nf=rows.filter(r=>(r.llm||{}).bias && r.llm.bias!=='FLAT' && r.llm.bias!=='UNKNOWN').length;
-      const agree=rows.filter(r=>{const act=(r.llm||{}).bias && r.llm.bias!=='FLAT' && r.llm.bias!=='UNKNOWN'; return act===(r.det_passed===true);}).length;
-      $('sh-n').textContent=n||'—';
-      $('sh-cov').textContent=n?((nf/n*100).toFixed(0)+'% ('+nf+'/'+n+')'):'—';
-      $('sh-agree').textContent=n?((agree/n*100).toFixed(0)+'%'):'—';
+    }catch(e){}
+    shEval();
+  }
+
+  async function shEval(){
+    try{
+      const j=await (await fetch('/shadow/eval?gap=1800',{cache:'no-store'})).json();
+      const e=j.eval||{}; const llm=e.llm||{}; const det=e.deterministic||{};
+      const P=x=>x==null?'—':(x*100).toFixed(0)+'%';
+      $('sh-n').textContent=(e.rows!=null?e.rows:'—')+' · '+(e.paired!=null?e.paired:'—');
+      $('sh-cov').textContent=llm.directional!=null?(P(llm.coverage)+' ('+llm.directional+')'):'—';
+      const h=$('sh-hit'); h.textContent=llm.hit_rate!=null?(P(llm.hit_rate)+' ('+llm.hits+'/'+llm.directional+')'):'—';
+      h.className=llm.hit_rate==null?'':(llm.hit_rate>0.5?'pos':llm.hit_rate<0.5?'neg':'');
+      $('sh-dethit').textContent=det.hit_rate!=null?(P(det.hit_rate)+' ('+det.directional+')'):'—';
+      const p=$('sh-pnl'); p.textContent=llm.dir_pnl_pct!=null?(llm.dir_pnl_pct>=0?'+':'')+llm.dir_pnl_pct.toFixed(2)+'%':'—';
+      p.className=llm.dir_pnl_pct==null?'':(llm.dir_pnl_pct>0?'pos':llm.dir_pnl_pct<0?'neg':'');
+      $('sh-agree').textContent=P(e.agreement_rate);
     }catch(e){}
   }
   $('sh-read').onclick=shRead;

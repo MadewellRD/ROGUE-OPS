@@ -91,6 +91,10 @@ class _Handler(BaseHTTPRequestHandler):
             q = parse_qs(route.query)
             self._json(control.shadow_ledger(_int(q.get("limit", ["100"])[0], 100)))
             return
+        if path == "/shadow/eval":
+            q = parse_qs(route.query)
+            self._json(control.shadow_eval(_float(q.get("gap", ["1800"])[0], 1800.0)))
+            return
         if path == "/shadow/status":
             self._json(control.ollama_status())
             return

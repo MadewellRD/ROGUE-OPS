@@ -236,6 +236,13 @@ def shadow_ledger(limit: int = 100) -> Dict[str, Any]:
     return {"ok": True, "rows": shadow_advisor.read_ledger(limit)}
 
 
+def shadow_eval(max_gap_sec: float = 1800.0) -> Dict[str, Any]:
+    """Score the accumulated ledger against realized forward moves."""
+    from advisory import shadow_advisor
+    from research.shadow_eval import score
+    return {"ok": True, "eval": score(shadow_advisor.read_ledger(1_000_000), max_gap_sec=max_gap_sec)}
+
+
 def _asdict(read) -> Dict[str, Any]:
     from dataclasses import asdict
     return asdict(read)
