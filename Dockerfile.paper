@@ -19,11 +19,17 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     EXECUTION_MODE=PAPER \
     OPS_MODE=PAPER \
     IBKR_HOST=host.docker.internal \
-    IBKR_PORT=4002
+    IBKR_PORT=4002 \
+    PYTHONPATH=/app/vendor
 
+# ibapi: easiest path is to copy your WORKING ibapi package folder (the dir with
+# __init__.py / client.py / wrapper.py — e.g. from your host site-packages/ibapi)
+# into ./vendor/ibapi. PYTHONPATH=/app/vendor then makes `import ibapi` resolve
+# with no setup.py needed. We also try PyPI as a bonus.
 RUN pip install --no-cache-dir requests tzdata && \
-    if [ -d /app/vendor/ibapi ]; then pip install --no-cache-dir /app/vendor/ibapi; \
-    else echo "WARNING: vendor/ibapi missing — paper loop will fail to import ibapi (see DOCKER.md)"; fi
+    ( pip install --no-cache-dir ibapi 2>/dev/null && echo "ibapi: installed via pip" ) || \
+    ( [ -d /app/vendor/ibapi ] && echo "ibapi: using /app/vendor (PYTHONPATH)" ) || \
+    echo "WARNING: no ibapi (pip miss AND vendor/ibapi missing) — see DOCKER.md step 2"
 
 VOLUME ["/data"]
 CMD ["python", "tools/run_paper_ibkr.py"]

@@ -101,10 +101,11 @@ no Steady**: live data *and* order execution both go through **IBKR**, via
    Desktop the connection arrives from the `172.x` bridge). Pair Gateway with
    **IBC** for unattended auto-login + a scheduled daily restart, so it survives
    reboots without you clicking anything.
-2. **Vendor `ibapi`.** IB's Python API isn't reliably on PyPI, so copy IB's TWS
-   API python client — the folder containing `setup.py` (from the TWS API
-   download's `IBJts/source/pythonclient`, or your host's `site-packages/ibapi`)
-   — into **`vendor/ibapi/`**. `Dockerfile.paper` installs it from there.
+2. **Vendor `ibapi` (easy path).** Copy your **already-working** `ibapi` package
+   folder — the directory with `__init__.py`/`client.py`/`wrapper.py`, i.e. your
+   host's `C:\Python314\Lib\site-packages\ibapi` — into **`vendor/ibapi/`**.
+   `Dockerfile.paper` sets `PYTHONPATH=/app/vendor`, so `import ibapi` just works
+   (no `setup.py` needed). It also tries `pip install ibapi` as a bonus.
 3. **Start the loop profile** (kept separate so the default `up` stays
    console-only):
 
