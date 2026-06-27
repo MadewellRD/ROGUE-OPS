@@ -32,31 +32,42 @@ services:
       - "host.docker.internal:host-gateway"   # reach host services (Ollama) from Linux engines
 
   # ----------------------------------------------------------------------------
-  # PAPER trading loop — enable when you want the engine "live" on paper fills.
+  # PAPER trading loop (GCP-free, IBKR live feed). Opt-in via the "paper"
+  # profile so the default `docker compose up` stays console-only:
+  #
+  #     docker compose --profile paper up -d --build
+  #
   # Requirements (see DOCKER.md):
-  #   - IB Gateway (or TWS) running on the host, API enabled, paper port 7497,
-  #     and this container's address added to TWS "Trusted IPs".
-  #   - An image that includes the IBKR Python API (ibapi). The console image
-  #     above does NOT include it; build a paper image per DOCKER.md.
-  #   - There is no proven edge yet — keep this on PAPER, not real capital.
+  #   - IB Gateway running on the host, API enabled, PAPER port 4002, with this
+  #     container's address added to Gateway "Trusted IPs".
+  #   - vendor/ibapi present (IB's TWS API python client) for Dockerfile.paper.
+  #   - No proven edge yet — this is PAPER. Real capital stays gated on the
+  #     signed re-cert + capital preflight, which this does not change.
+  # The loop shares ./.roguedata with the console, so the console KILL button
+  # halts it (writes /data/KILL; honored on the next cycle, restart to resume).
   # ----------------------------------------------------------------------------
-  # loop:
-  #   build: { context: ., dockerfile: Dockerfile.paper }
-  #   container_name: rogue-loop
-  #   restart: unless-stopped
-  #   command: ["python", "main.py", "--mode", "PAPER"]
-  #   environment:
-  #     - EXECUTION_MODE=PAPER
-  #     - OPS_MODE=PAPER
-  #     - ROGUE_OPS_HOME=/data
-  #     - IBKR_HOST=host.docker.internal
-  #     - IBKR_PORT=7497
-  #     - IBKR_ACCOUNT_ID=${IBKR_ACCOUNT_ID:-}
-  #     - MASSIVE_API_KEY=${MASSIVE_API_KEY:-}
-  #     - OLLAMA_SHADOW=1
-  #     - OLLAMA_HOST=http://host.docker.internal:11434
-  #     - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2}
-  #   volumes:
-  #     - ./.roguedata:/data
-  #   extra_hosts:
-  #     - "host.docker.internal:host-gateway"
+  loop:
+    build:
+      context: .
+      dockerfile: Dockerfile.paper
+    image: rogue-ops-paper
+    container_name: rogue-loop
+    restart: unless-stopped
+    profiles: ["paper"]
+    command: ["python", "tools/run_paper_ibkr.py"]
+    environment:
+      - EXECUTION_MODE=PAPER
+      - OPS_MODE=PAPER
+      - ROGUE_OPS_HOME=/data
+      - IBKR_HOST=host.docker.internal
+      - IBKR_PORT=4002
+      - IBKR_ACCOUNT_ID=${IBKR_ACCOUNT_ID:-}
+      - PRIMARY_SYMBOL=${PRIMARY_SYMBOL:-SPY}
+      - IBKR_BAR_SIZE=${IBKR_BAR_SIZE:-1 min}
+      - OLLAMA_SHADOW=${OLLAMA_SHADOW:-1}
+      - OLLAMA_HOST=http://host.docker.internal:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2}
+    volumes:
+      - ./.roguedata:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

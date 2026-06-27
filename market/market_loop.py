@@ -19,7 +19,6 @@ from typing import Optional
 from ops_config import OPSConfig
 from governance.kill_switch import kill_active, engage_kill
 
-from market.market_data_adapter_steady import get_market_snapshot
 from advisory.indicator_authority import IndicatorAssertion
 from advisory.indicator_engine import IndicatorEngine
 from advisory.signal_engine import SignalEngine
@@ -108,10 +107,19 @@ def run_market_loop(
     primary_symbol: Optional[str],
     state_machine: StateMachineV2,
     account_id: str,
+    snapshot_provider=None,
 ) -> None:
     """
     Market runtime host. Acquires data, computes indicators, and runs one
     market_step per cycle. Kill-dominant.
+
+    Data source:
+      - snapshot_provider is None (default): the legacy Steady adapter (needs
+        steady_api_key). Imported lazily so non-Steady deployments need neither
+        the key nor `requests`.
+      - snapshot_provider given: a callable(symbol) -> MarketSnapshot | None.
+        None means "no new bar this cycle" and the cycle is skipped. This is the
+        IBKR live feed path (see market_data_ibkr_live.IBKRSnapshotProvider).
     """
 
     indicator_engine = IndicatorEngine()
@@ -131,11 +139,18 @@ def run_market_loop(
 
             iteration += 1
 
-            snapshot = get_market_snapshot(
-                symbol=symbol,
-                source=execution_mode,
-                api_key=steady_api_key,
-            )
+            if snapshot_provider is not None:
+                snapshot = snapshot_provider(symbol)
+                if snapshot is None:
+                    time.sleep(1)
+                    continue  # no new bar yet — do not advance indicators
+            else:
+                from market.market_data_adapter_steady import get_market_snapshot
+                snapshot = get_market_snapshot(
+                    symbol=symbol,
+                    source=execution_mode,
+                    api_key=steady_api_key,
+                )
 
             indicators = indicator_engine.update(snapshot)
             if not isinstance(indicators, IndicatorAssertion):

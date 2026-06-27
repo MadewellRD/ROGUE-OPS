@@ -355,5 +355,11 @@ def get_ibkr_runtime() -> IBKRRuntime:
     global _RUNTIME
     with _RUNTIME_LOCK:
         if _RUNTIME is None:
-            _RUNTIME = IBKRRuntime()
+            # Honor IBKR_HOST/IBKR_PORT so execution follows the data feed to
+            # Gateway (paper 4002) and, in a container, to host.docker.internal.
+            import os
+            _RUNTIME = IBKRRuntime(
+                host=os.getenv("IBKR_HOST", "127.0.0.1"),
+                port=int(os.getenv("IBKR_PORT", "7497")),
+            )
         return _RUNTIME

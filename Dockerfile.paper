@@ -1,0 +1,29 @@
+# ROGUE:OPS paper-loop image (GCP-free, IBKR live feed).
+#
+# Runs tools/run_paper_ibkr.py: live data + order execution via IBKR
+# (IBKR_HOST/IBKR_PORT -> IB Gateway paper 4002). No GCP, no Steady.
+#
+# The IBKR Python API (ibapi) is not reliably on PyPI, so VENDOR it: copy IB's
+# TWS API python client (the folder containing setup.py, from the TWS API
+# download's IBJts/source/pythonclient, or your host site-packages) into
+# ./vendor/ibapi before building. See DOCKER.md.
+#
+FROM python:3.12-slim
+
+WORKDIR /app
+COPY . /app
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    ROGUE_OPS_HOME=/data \
+    EXECUTION_MODE=PAPER \
+    OPS_MODE=PAPER \
+    IBKR_HOST=host.docker.internal \
+    IBKR_PORT=4002
+
+RUN pip install --no-cache-dir requests tzdata && \
+    if [ -d /app/vendor/ibapi ]; then pip install --no-cache-dir /app/vendor/ibapi; \
+    else echo "WARNING: vendor/ibapi missing — paper loop will fail to import ibapi (see DOCKER.md)"; fi
+
+VOLUME ["/data"]
+CMD ["python", "tools/run_paper_ibkr.py"]

@@ -89,40 +89,46 @@ only comes back if its supervisor is running. Two ways:
 
 ---
 
-## 3. The engine "live" on paper (later, deliberate)
+## 3. The engine "live" on paper (IBKR feed, GCP-free)
 
-This is the real "trading all the time" piece. It needs three things the console
-doesn't:
+This is the real "trading all the time" piece, wired the modern way — **no GCP,
+no Steady**: live data *and* order execution both go through **IBKR**, via
+`tools/run_paper_ibkr.py`. Three prerequisites:
 
-1. **IB Gateway, not TWS.** Gateway is the headless, always-up-friendly IBKR
-   endpoint. Pair it with **IBC** (IBController) for unattended auto-login and a
-   scheduled daily restart. Enable the API, paper port **7497**, and add the
-   container's address to **Trusted IPs** (`host-gateway`/`172.17.0.1`-range).
-2. **An image with the IBKR Python API (`ibapi`).** The console image omits it on
-   purpose. Build a paper image, e.g. `Dockerfile.paper`:
+1. **IB Gateway (paper).** Headless and always-up-friendly. Log into the **paper**
+   account, enable the API, set the socket port to **4002**, and add the
+   container's address to **Trusted IPs** (the `host-gateway` address; on Docker
+   Desktop the connection arrives from the `172.x` bridge). Pair Gateway with
+   **IBC** for unattended auto-login + a scheduled daily restart, so it survives
+   reboots without you clicking anything.
+2. **Vendor `ibapi`.** IB's Python API isn't reliably on PyPI, so copy IB's TWS
+   API python client — the folder containing `setup.py` (from the TWS API
+   download's `IBJts/source/pythonclient`, or your host's `site-packages/ibapi`)
+   — into **`vendor/ibapi/`**. `Dockerfile.paper` installs it from there.
+3. **Start the loop profile** (kept separate so the default `up` stays
+   console-only):
 
-   ```dockerfile
-   FROM python:3.12-slim
-   WORKDIR /app
-   COPY . /app
-   ENV PYTHONUNBUFFERED=1 ROGUE_OPS_HOME=/data
-   # Install the IBKR API per IB's distribution (it is not reliably on PyPI):
-   # COPY vendor/ibapi /tmp/ibapi && pip install /tmp/ibapi
-   CMD ["python", "main.py", "--mode", "PAPER"]
+   ```powershell
+   docker compose --profile paper up -d --build
+   docker compose logs -f loop
    ```
 
-3. **Uncomment the `loop:` service** in `docker-compose.yml` and point it at
-   `IBKR_HOST=host.docker.internal`, `IBKR_PORT=7497`. It mounts the same
-   `./.roguedata`, so it shares the kill file and writes the shadow ledger.
+   It runs `run_paper_ibkr.py` against `host.docker.internal:4002`, mounts the
+   same `./.roguedata`, and (with `OLLAMA_SHADOW=1`) fills the shadow ledger as
+   it trades.
 
-Because the loop shares `/data`, you can **kill it from the console** (the KILL
-button writes `/data/KILL`; the loop halts on its next cycle and won't resume
-until you clear the file and restart). That is the control that makes an
-auto-restarting trader safe.
+Because the loop shares `/data`, the console **KILL** button halts it — it writes
+`/data/KILL`, the loop stops on its next cycle, and won't resume until you clear
+the file and restart. That shared kill is what makes an auto-restarting trader
+safe.
 
-Keep it on **PAPER**. Promotion to real capital is gated on a validated edge,
-the signed re-cert, and the capital preflight — none of which the container
-changes.
+Feed/timing notes: the live feed is rolling 1-min `reqHistoricalData` bars, so
+indicators warm over ~20 minutes; tune with `IBKR_BAR_SIZE`, `IBKR_DURATION`,
+`IBKR_REFETCH_SEC`. It only acts during RTH (10:00–14:30 ET entries, flat 15:55),
+so expect long idle stretches.
+
+Keep it on **PAPER**. Promotion to real capital is gated on a validated edge, the
+signed re-cert, and the capital preflight — none of which the container changes.
 
 ---
 
@@ -138,4 +144,4 @@ changes.
 | Engaged kill persists | yes — `./.roguedata/KILL`, honored on boot |
 | Research/Massive | set `MASSIVE_API_KEY` in `.env` |
 | Shadow LLM | host `ollama serve`; container uses `host.docker.internal:11434` |
-| Paper loop | IB Gateway + IBC, `Dockerfile.paper` with `ibapi`, uncomment `loop:` |
+| Paper loop | IB Gateway @4002 + IBC, `vendor/ibapi`, `docker compose --profile paper up -d --build` |
