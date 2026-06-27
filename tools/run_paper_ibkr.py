@@ -61,7 +61,6 @@ def main() -> None:
 
     run_market_loop(
         ops_config=ops_config,
-        steady_api_key=None,
         primary_symbol=symbol,
         state_machine=state_machine,
         account_id=account_id,

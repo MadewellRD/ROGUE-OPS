@@ -102,24 +102,21 @@ def market_step(
 def run_market_loop(
     *,
     ops_config: OPSConfig,
-    steady_api_key: str,
-    strategy_registry=None,   # retained for call-site compatibility (unused)
     primary_symbol: Optional[str],
     state_machine: StateMachineV2,
     account_id: str,
-    snapshot_provider=None,
+    snapshot_provider,
+    strategy_registry=None,   # retained for call-site compatibility (unused)
 ) -> None:
     """
     Market runtime host. Acquires data, computes indicators, and runs one
     market_step per cycle. Kill-dominant.
 
-    Data source:
-      - snapshot_provider is None (default): the legacy Steady adapter (needs
-        steady_api_key). Imported lazily so non-Steady deployments need neither
-        the key nor `requests`.
-      - snapshot_provider given: a callable(symbol) -> MarketSnapshot | None.
-        None means "no new bar this cycle" and the cycle is skipped. This is the
-        IBKR live feed path (see market_data_ibkr_live.IBKRSnapshotProvider).
+    Data source: `snapshot_provider` is REQUIRED — a callable(symbol) ->
+    MarketSnapshot | None, where None means "no new bar this cycle" (skip). The
+    legacy SteadyAPI feed was removed; the live feed is IBKR (see
+    market_data_ibkr_live.IBKRSnapshotProvider). With no provider the loop fails
+    closed (engages kill) rather than run blind.
     """
 
     indicator_engine = IndicatorEngine()
@@ -139,18 +136,16 @@ def run_market_loop(
 
             iteration += 1
 
-            if snapshot_provider is not None:
-                snapshot = snapshot_provider(symbol)
-                if snapshot is None:
-                    time.sleep(1)
-                    continue  # no new bar yet — do not advance indicators
-            else:
-                from market.market_data_adapter_steady import get_market_snapshot
-                snapshot = get_market_snapshot(
-                    symbol=symbol,
-                    source=execution_mode,
-                    api_key=steady_api_key,
-                )
+            if snapshot_provider is None:
+                # Steady was removed; the loop requires an injected live feed
+                # (see tools/run_paper_ibkr.py). Fail closed rather than run blind.
+                engage_kill(reason="NO_SNAPSHOT_PROVIDER")
+                print("[MARKET LOOP] No snapshot_provider — fail-closed halt.")
+                return
+            snapshot = snapshot_provider(symbol)
+            if snapshot is None:
+                time.sleep(1)
+                continue  # no new bar yet — do not advance indicators
 
             indicators = indicator_engine.update(snapshot)
             if not isinstance(indicators, IndicatorAssertion):
