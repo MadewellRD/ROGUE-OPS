@@ -16,6 +16,8 @@ from typing import Any, Dict, Optional
 
 # Latest market frame published by the live loop (transient, in-memory).
 _LAST_FRAME: Dict[str, Any] = {}
+# Latest auto shadow-LLM read (when OLLAMA_SHADOW is enabled). Advisory only.
+_LAST_SHADOW: Dict[str, Any] = {}
 
 
 def _now() -> str:
@@ -50,6 +52,14 @@ def publish_frame(*, snapshot=None, indicators=None, signal_status: Optional[str
 def get_last_frame() -> Dict[str, Any]:
     """The most recent market frame published by the live loop (or {})."""
     return dict(_LAST_FRAME)
+
+
+def publish_shadow(read: Dict[str, Any]) -> None:
+    """Called by the shadow runner when an auto read completes (advisory only)."""
+    global _LAST_SHADOW
+    r = dict(read or {})
+    r["ts_utc"] = _now()
+    _LAST_SHADOW = r
 
 
 def _safe(fn, default=None):
@@ -130,5 +140,7 @@ def get_terminal_state() -> Dict[str, Any]:
         from api.control import arm_state
         return {"armed": arm_state()}
     state["control"] = _safe(_arm, {"armed": False})
+
+    state["shadow"] = _LAST_SHADOW or None
 
     return state

@@ -159,6 +159,23 @@ def run_market_loop(
             except Exception:
                 pass
 
+            # Optional SHADOW LLM read (OFF unless OLLAMA_SHADOW=1). Runs on a
+            # daemon thread, throttled + single-flight, logged only. It is fully
+            # isolated and can never affect this loop's decision, result, or timing.
+            try:
+                from advisory.shadow_runner import maybe_shadow
+                maybe_shadow(
+                    symbol=symbol,
+                    spot=getattr(snapshot, "spot", None),
+                    session=getattr(snapshot, "session", "REGULAR"),
+                    req=indicators.required,
+                    vwap=(getattr(indicators, "advisory", {}) or {}).get("VWAP"),
+                    det_signal=status,
+                    det_passed=indicators.required_passed,
+                )
+            except Exception:
+                pass
+
             print(f"[HEARTBEAT] iter={iteration} status={status} spot={snapshot.spot}")
             time.sleep(1)
 
