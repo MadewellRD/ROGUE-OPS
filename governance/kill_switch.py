@@ -43,6 +43,7 @@ def engage_kill(reason: str) -> None:
         _KILL_STATE = True
         _KILL_REASON = reason
         _KILL_TIMESTAMP_UTC = _now_utc()
+        _write_kill_file(reason)
 
 
 def kill_active() -> bool:
@@ -58,8 +59,11 @@ def kill_active() -> bool:
     if _KILL_STATE:
         return True
 
-    env_flag = os.getenv("OPS_KILL_SWITCH", "false").lower() == "true"
-    return env_flag
+    if os.getenv("OPS_KILL_SWITCH", "false").lower() == "true":
+        return True
+
+    # Durable, cross-process kill: a file engaged by the operator / terminal.
+    return _kill_file_present()
 
 
 def kill_context() -> dict:
@@ -85,3 +89,59 @@ def _now_utc() -> str:
         .isoformat()
         .replace("+00:00", "Z")
     )
+
+
+# ==================================================
+# Durable, cross-process kill file
+# ==================================================
+#
+# A separately-running operator surface (the terminal/console) cannot reach the
+# in-process kill state of the trading loop. A file under ROGUE_OPS_HOME bridges
+# that gap: the console writes it, the trading loop's kill_active() sees it on
+# its next check and halts. This is strictly ADDITIVE to the fail-closed logic —
+# it can only ever cause MORE kills, never fewer.
+
+def _kill_file_path():
+    try:
+        from governance.paths import ops_home
+        return ops_home() / "KILL"
+    except Exception:
+        return None
+
+
+def _kill_file_present() -> bool:
+    p = _kill_file_path()
+    try:
+        return bool(p and p.exists())
+    except Exception:
+        # Fail-closed: if we cannot tell, do not claim "not killed" on the file
+        # path; the in-process / env checks above already ran.
+        return False
+
+
+def _write_kill_file(reason: str) -> None:
+    p = _kill_file_path()
+    if not p:
+        return
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(f"{_now_utc()} {reason}", encoding="utf-8")
+    except Exception:
+        pass
+
+
+def clear_kill_file() -> bool:
+    """
+    Operator action: remove the durable kill file. This does NOT reset the
+    in-process kill state (kill remains irreversible for a running process) —
+    it only clears the durable flag so the NEXT process start is not killed.
+    Returns True if a file was removed.
+    """
+    p = _kill_file_path()
+    try:
+        if p and p.exists():
+            p.unlink()
+            return True
+    except Exception:
+        pass
+    return False

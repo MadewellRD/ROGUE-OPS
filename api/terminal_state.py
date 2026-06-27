@@ -121,4 +121,9 @@ def get_terminal_state() -> Dict[str, Any]:
         "equities": os.getenv("EQUITY_BROKER", "ROBINHOOD"),
     }
 
+    def _arm():
+        from api.control import arm_state
+        return {"armed": arm_state()}
+    state["control"] = _safe(_arm, {"armed": False})
+
     return state

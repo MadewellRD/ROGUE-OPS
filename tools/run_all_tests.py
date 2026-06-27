@@ -10,8 +10,10 @@
 #
 
 import os
+import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
@@ -27,6 +29,7 @@ DEFAULT_TESTS = [
     "test_backtest",
     "test_strategies",
     "test_intraday",
+    "test_console",
     "run_sim_regression",
 ]
 
@@ -40,10 +43,23 @@ def main(argv) -> int:
     tests = argv[1:] or DEFAULT_TESTS
     env = dict(os.environ)
     env["PYTHONDONTWRITEBYTECODE"] = "1"
-    env.setdefault("ROGUE_OPS_HOME", str(REPO / ".rogueops_test"))
+    # A fresh, self-owned ops home per invocation. Tests share it, but each runs
+    # in its own process, so only DURABLE cross-process state (the kill / arm
+    # files) can leak between them — we clear those before each test to keep the
+    # isolation the suite depends on, without weakening the kill mechanism.
+    ops_home = env.get("ROGUE_OPS_HOME") or tempfile.mkdtemp(prefix="rogueops_test_")
+    env["ROGUE_OPS_HOME"] = ops_home
+
+    def _reset_durable():
+        for fn in ("KILL", "ARM"):
+            try:
+                os.remove(os.path.join(ops_home, fn))
+            except OSError:
+                pass  # absent, or not ours to remove — fresh temp homes avoid this
 
     results = []
     for name in tests:
+        _reset_durable()
         fname = name if name.endswith(".py") else name + ".py"
         path = REPO / "tools" / fname
         proc = subprocess.run(
@@ -55,6 +71,7 @@ def main(argv) -> int:
         print(f"  {'PASS' if ok else 'FAIL'}  {name:<22} {detail}")
         results.append(ok)
 
+    shutil.rmtree(ops_home, ignore_errors=True)
     passed = sum(1 for r in results if r)
     print("-" * 64)
     print(f"  {passed}/{len(results)} passed")

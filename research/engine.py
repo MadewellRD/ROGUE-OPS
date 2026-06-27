@@ -90,6 +90,21 @@ def metrics(trades: List[Trade]) -> Dict:
     }
 
 
+def equity_curve(trades: List[Trade]) -> List[Dict]:
+    """Cumulative equity after each trade, indexed from a 1.0 base.
+
+    Returns points the console charts directly: trade index, exit date, the
+    compounding equity multiple, and that trade's net return. A leading
+    (0, base) point anchors the line at 1.0 before any trade closes.
+    """
+    pts = [{"i": 0, "date": "", "equity": 1.0, "ret": 0.0}]
+    eq = 1.0
+    for i, t in enumerate(trades, start=1):
+        eq *= (1 + t.ret)
+        pts.append({"i": i, "date": t.exit_date, "equity": round(eq, 6), "ret": round(t.ret, 6)})
+    return pts
+
+
 def walk_forward(rows: List[Dict], strategy, split: float = 0.6, cost_bps: float = 2.0) -> Dict:
     """Split rows by time: in-sample (first `split`) vs out-of-sample (rest)."""
     k = int(len(rows) * split)
