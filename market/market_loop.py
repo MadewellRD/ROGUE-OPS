@@ -144,6 +144,11 @@ def run_market_loop(
                 return
             snapshot = snapshot_provider(symbol)
             if snapshot is None:
+                try:
+                    from api.terminal_state import publish_state_file
+                    publish_state_file()  # heartbeat: keep the console's view fresh between bars
+                except Exception:
+                    pass
                 time.sleep(1)
                 continue  # no new bar yet — do not advance indicators
 

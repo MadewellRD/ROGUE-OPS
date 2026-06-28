@@ -3,21 +3,32 @@
 #
 # Terminal State Aggregator
 #
-# Gathers a point-in-time view of ROGUE:OPS for the operator terminal:
-# kill/ops state, capital, risk/daily-loss, the open position, and the latest
-# market frame (spot + indicators + signal status) published by the market loop.
+# Gathers a point-in-time view of ROGUE:OPS for the operator console:
+# kill/ops state, capital, risk/daily-loss, the open position, the latest market
+# frame, and the latest shadow read.
 #
-# Read-only. Defensive. Never raises (the terminal must render even mid-failure).
+# CROSS-PROCESS: the trading loop and the console run as SEPARATE processes
+# (separate containers). The loop holds the live frame / risk / position in its
+# own memory, so it PUBLISHES a full snapshot to a shared file
+# (ROGUE_OPS_HOME/state.json) each cycle. The console, which has no live
+# in-process state, reads that file. Kill + arm are always re-resolved live
+# (they are file-backed + cross-process) so safety state is never stale.
+#
+# Read-only for the console. Defensive. Never raises.
 #
 
 import os
+import json
+import time
 import datetime as dt
 from typing import Any, Dict, Optional
 
-# Latest market frame published by the live loop (transient, in-memory).
+# Live state held by the LOOP process (transient, in-memory).
 _LAST_FRAME: Dict[str, Any] = {}
-# Latest auto shadow-LLM read (when OLLAMA_SHADOW is enabled). Advisory only.
 _LAST_SHADOW: Dict[str, Any] = {}
+
+# How fresh the loop's published snapshot must be for the console to trust it.
+_STATE_FILE_MAX_AGE_SEC = 90.0
 
 
 def _now() -> str:
@@ -28,6 +39,10 @@ def _now() -> str:
         .replace("+00:00", "Z")
     )
 
+
+# ==================================================
+# Loop-side publishing
+# ==================================================
 
 def publish_frame(*, snapshot=None, indicators=None, signal_status: Optional[str] = None) -> None:
     """Called by the market loop each cycle to surface live market state."""
@@ -47,6 +62,7 @@ def publish_frame(*, snapshot=None, indicators=None, signal_status: Optional[str
     if signal_status is not None:
         frame["signal_status"] = signal_status
     _LAST_FRAME = frame
+    publish_state_file()
 
 
 def get_last_frame() -> Dict[str, Any]:
@@ -60,7 +76,12 @@ def publish_shadow(read: Dict[str, Any]) -> None:
     r = dict(read or {})
     r["ts_utc"] = _now()
     _LAST_SHADOW = r
+    publish_state_file()
 
+
+# ==================================================
+# Helpers
+# ==================================================
 
 def _safe(fn, default=None):
     try:
@@ -69,7 +90,21 @@ def _safe(fn, default=None):
         return {"error": str(e)} if default is None else default
 
 
-def get_terminal_state() -> Dict[str, Any]:
+def _live_kill() -> Dict[str, Any]:
+    from governance.kill_switch import kill_context
+    return kill_context()
+
+
+def _live_arm() -> Dict[str, Any]:
+    from api.control import arm_state
+    return {"armed": arm_state()}
+
+
+# ==================================================
+# Full state snapshot (built from THIS process)
+# ==================================================
+
+def build_state() -> Dict[str, Any]:
     state: Dict[str, Any] = {
         "ts_utc": _now(),
         "system": "ROGUE:OPS",
@@ -78,10 +113,7 @@ def get_terminal_state() -> Dict[str, Any]:
         "ops_mode": os.getenv("OPS_MODE", ""),
     }
 
-    def _kill():
-        from governance.kill_switch import kill_context
-        return kill_context()
-    state["kill"] = _safe(_kill)
+    state["kill"] = _safe(_live_kill)
 
     def _risk():
         from capital.daily_loss_governor import current_realized_pnl, is_breached, _max_loss
@@ -136,11 +168,59 @@ def get_terminal_state() -> Dict[str, Any]:
         "equities": os.getenv("EQUITY_BROKER", "ROBINHOOD"),
     }
 
-    def _arm():
-        from api.control import arm_state
-        return {"armed": arm_state()}
-    state["control"] = _safe(_arm, {"armed": False})
-
+    state["control"] = _safe(_live_arm, {"armed": False})
     state["shadow"] = _LAST_SHADOW or None
-
     return state
+
+
+# ==================================================
+# Shared-file bridge (loop writes, console reads)
+# ==================================================
+
+def _state_file_path():
+    from governance.paths import ops_home
+    return ops_home() / "state.json"
+
+
+def publish_state_file() -> None:
+    """LOOP side: write the full live snapshot to the shared volume so a separate
+    console process can render it. Best-effort; never raises into the loop."""
+    try:
+        snap = build_state()
+        snap["published_ts"] = _now()
+        p = _state_file_path()
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(json.dumps(snap, default=str), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def _read_state_file(max_age_sec: float = _STATE_FILE_MAX_AGE_SEC) -> Optional[Dict[str, Any]]:
+    try:
+        p = _state_file_path()
+        if not p.exists():
+            return None
+        age = time.time() - p.stat().st_mtime
+        if age > max_age_sec:
+            return None
+        data = json.loads(p.read_text(encoding="utf-8"))
+        data["_age_sec"] = round(age, 1)
+        return data
+    except Exception:
+        return None
+
+
+def get_terminal_state() -> Dict[str, Any]:
+    """CONSOLE side: prefer a fresh loop-published snapshot (this process has no
+    live frame/risk/position of its own). Kill + control are always re-resolved
+    live so safety state is never stale."""
+    snap = _read_state_file()
+    if snap is not None:
+        snap["source"] = "loop"
+        snap["ts_utc"] = _now()
+        snap["kill"] = _safe(_live_kill)
+        snap["control"] = _safe(_live_arm, {"armed": False})
+        return snap
+    s = build_state()
+    s["source"] = "local"
+    return s

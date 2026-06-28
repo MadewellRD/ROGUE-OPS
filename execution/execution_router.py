@@ -13,6 +13,7 @@
 
 import hashlib
 import json
+import os
 
 from execution.execution_envelope import ExecutionEnvelope
 from execution.position_sizing_authority import (
@@ -35,10 +36,11 @@ OPTION_MULTIPLIER = 100
 SIM_MAX_NOTIONAL_USD = 100_000
 SIM_MAX_CONTRACTS = 10
 
-# PAPER / CAPITAL — production hard limits
-# Aligned to CAPITAL_GO_LIVE_AUTHORIZATION.md (max 5 contracts / trade).
-MAX_CAPITAL_NOTIONAL_USD = 5_000
-MAX_CAPITAL_CONTRACTS = 5
+# PAPER / CAPITAL — production hard backstops.
+# Go-live default is 1 contract (tuition size). Both are env-overridable so the
+# cap is explicit + auditable, never silently widened.
+MAX_CAPITAL_NOTIONAL_USD = int(os.getenv("MAX_CAPITAL_NOTIONAL_USD", "5000"))
+MAX_CAPITAL_CONTRACTS = int(os.getenv("MAX_CAPITAL_CONTRACTS", "1"))
 
 
 # ==================================================
