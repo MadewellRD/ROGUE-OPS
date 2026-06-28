@@ -49,6 +49,7 @@
   #view-live{grid-template-columns:repeat(12,1fr);grid-template-rows:1.32fr 1fr 0.62fr}
   #view-research{grid-template-columns:repeat(12,1fr);grid-template-rows:auto 1.12fr 0.95fr}
   #view-shadow{grid-template-columns:repeat(12,1fr);grid-template-rows:auto 1fr 1.5fr}
+  #view-track{grid-template-columns:repeat(12,1fr);grid-template-rows:0.9fr 1.1fr}
 
   .panel{background:var(--panel);border:1px solid var(--border);border-radius:5px;display:flex;flex-direction:column;min-height:0;overflow:hidden}
   .panel h2{flex:0 0 auto;margin:0;font-size:11px;letter-spacing:1.2px;color:var(--amber);text-transform:uppercase;
@@ -127,6 +128,7 @@
     <div class="tab active" data-view="live">Live</div>
     <div class="tab" data-view="research">Research</div>
     <div class="tab" data-view="shadow">Shadow LLM</div>
+    <div class="tab" data-view="track">Track Record</div>
   </div>
 
   <div class="stage">
@@ -332,6 +334,36 @@
         </div>
       </div>
     </div>
+
+    <!-- ============ TRACK RECORD ============ -->
+    <div class="view" id="view-track">
+      <div class="panel col-6">
+        <h2>Track Record <span class="sub">closed paper trades · feeds the go-live gate</span></h2>
+        <div class="body">
+          <div class="kv"><span class="k">Trades (W / L)</span><span id="tr-n">—</span></div>
+          <div class="kv"><span class="k">Win rate</span><span id="tr-wr">—</span></div>
+          <div class="kv"><span class="k">Gross P&L</span><span id="tr-gross">—</span></div>
+          <div class="kv"><span class="k">Expectancy / trade</span><span id="tr-exp">—</span></div>
+          <div class="kv"><span class="k">Avg win / loss</span><span id="tr-aw">—</span></div>
+          <div class="kv"><span class="k">Best / worst</span><span id="tr-bw">—</span></div>
+          <div class="kv"><span class="k">Max drawdown</span><span id="tr-dd">—</span></div>
+          <div class="muted" style="margin-top:8px;font-size:10.5px">Realized P&L, each entry paired with its exit. The go/no-go gate reads this.</div>
+        </div>
+      </div>
+      <div class="panel col-6">
+        <h2>Equity Curve <span class="sub">cumulative realized P&L (USD)</span></h2>
+        <div class="body"><div class="cw" style="margin-top:0"><canvas id="tr-chart"></canvas></div></div>
+      </div>
+      <div class="panel col-12">
+        <h2>Closed Trades <span class="sub">most recent last</span></h2>
+        <div class="body scroll" style="padding:0">
+          <table class="tbl">
+            <thead><tr><th>Closed (UTC)</th><th>Sym</th><th>Strike</th><th>R</th><th>Side</th><th>Qty</th><th>Entry</th><th>Exit</th><th>P&L</th></tr></thead>
+            <tbody id="tr-rows"><tr><td colspan="9" class="muted" style="padding:14px">No closed trades yet — paper-forward records here as it trades (Mon RTH).</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -352,6 +384,7 @@
     $('view-'+t.dataset.view).classList.add('active');
     if(t.dataset.view==='research'){ setTimeout(()=>{ if(eqChart) eqChart.resize(); if(pxChart) pxChart.resize(); },30); }
     else if(t.dataset.view==='shadow'){ shStatus(); shLedger(); }
+    else if(t.dataset.view==='track'){ trLoad(); setTimeout(()=>{ if(trChart) trChart.resize(); },30); }
     else { setTimeout(()=>chart.resize(),30); }
   });
 
@@ -651,9 +684,37 @@
   $('sh-read').onclick=shRead;
   $('sh-refresh').onclick=()=>{shStatus();shLedger();};
 
+  // ---------- track record ----------
+  let trChart=null;
+  function trEnsure(){ if(!trChart) trChart=mkChart('tr-chart',{type:'line',
+    data:{labels:[],datasets:[{label:'cum',data:[],borderColor:'#2bff88',borderWidth:1.6,pointRadius:0,tension:.12}]},
+    options:{animation:false,responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{ticks:{color:'#5d6f7c',font:{size:9},maxTicksLimit:8}},y:{ticks:{color:'#5d6f7c',font:{size:9}},grid:{color:'#11202c'}}}}}); }
+  async function trLoad(){
+    try{
+      const j=await (await fetch('/scorecard?limit=1000',{cache:'no-store'})).json();
+      const m=j.scorecard||{}, recent=j.recent||[]; const wr=m.win_rate;
+      $('tr-n').textContent=(m.trades!=null?m.trades:'—')+(m.trades?(' ('+m.wins+'/'+m.losses+')'):'');
+      $('tr-wr').textContent=wr!=null?(wr*100).toFixed(0)+'%':'—';
+      const g=$('tr-gross'); g.textContent=USD(m.gross_pnl_usd); g.className=(m.gross_pnl_usd>0?'pos':m.gross_pnl_usd<0?'neg':'');
+      $('tr-exp').textContent=m.expectancy_usd!=null?USD(m.expectancy_usd):'—';
+      $('tr-aw').textContent=USD(m.avg_win_usd)+' / '+USD(m.avg_loss_usd);
+      $('tr-bw').textContent=USD(m.best_usd)+' / '+USD(m.worst_usd);
+      const dd=$('tr-dd'); dd.textContent=USD(m.max_drawdown_usd); dd.className=(m.max_drawdown_usd<0?'neg':'');
+      trEnsure(); const c=m.equity_curve||[];
+      trChart.data.labels=c.map(p=>p.i); trChart.data.datasets[0].data=c.map(p=>p.cum);
+      trChart.data.datasets[0].borderColor=(c.length&&c[c.length-1].cum>=0)?'#2bff88':'#ff4d4d'; trChart.update('none');
+      const tb=$('tr-rows');
+      if(!recent.length){ tb.innerHTML='<tr><td colspan="9" class="muted" style="padding:14px">No closed trades yet.</td></tr>'; }
+      else{ tb.innerHTML=''; recent.forEach(r=>{ const tr=document.createElement('tr'); const p=Number(r.realized_pnl_usd);
+        tr.innerHTML=`<td>${(r.closed_at_utc||r.ts_utc||'').replace('T',' ').substr(0,19)}</td><td>${r.symbol||'—'}</td><td>${r.strike!=null?r.strike:'—'}</td><td>${r.right||''}</td><td>${r.action||''}</td><td>${r.quantity!=null?r.quantity:''}</td><td>${r.entry_price!=null?Number(r.entry_price).toFixed(2):'—'}</td><td>${r.exit_price!=null?Number(r.exit_price).toFixed(2):'—'}</td><td class="${p>0?'pos':p<0?'neg':''}">${USD(p)}</td>`;
+        tb.appendChild(tr); }); tb.parentElement.parentElement.scrollTop=99999; }
+    }catch(e){}
+  }
+
   clocks(); setInterval(clocks,1000);
   poll(); setInterval(poll,1000);
-  window.addEventListener('resize',()=>{ chart.resize(); if(eqChart)eqChart.resize(); if(pxChart)pxChart.resize(); });
+  window.addEventListener('resize',()=>{ chart.resize(); if(eqChart)eqChart.resize(); if(pxChart)pxChart.resize(); if(trChart)trChart.resize(); });
 })();
 </script>
 </body>
