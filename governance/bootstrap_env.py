@@ -28,13 +28,12 @@ from pathlib import Path
 # JSON file containing environment defaults (cross-platform path)
 from governance.paths import bootstrap_path
 
-# Keys required only when running a broker/cloud-backed mode.
+# Keys required only for broker-backed modes (PAPER / LIVE).
 # SIM and REPLAY are fully self-contained and require none of these.
-_CLOUD_REQUIRED_KEYS = [
+# GCP / doctrine was dropped when the live feed moved to IBKR (+ Massive for
+# history), so the only broker-mode requirement now is the IBKR account.
+_BROKER_REQUIRED_KEYS = [
     "IBKR_ACCOUNT_ID",
-    "GCP_PROJECT_ID",
-    "DOCTRINE_BUCKET",
-    "GOOGLE_APPLICATION_CREDENTIALS",
 ]
 
 
@@ -42,7 +41,7 @@ def _required_keys() -> list:
     execution_mode = os.getenv("EXECUTION_MODE", "SIM")
     ops_mode = os.getenv("OPS_MODE", "")
     sim_like = execution_mode == "SIM" or ops_mode in ("SIM", "REPLAY")
-    return [] if sim_like else _CLOUD_REQUIRED_KEYS
+    return [] if sim_like else _BROKER_REQUIRED_KEYS
 
 
 # ==================================================

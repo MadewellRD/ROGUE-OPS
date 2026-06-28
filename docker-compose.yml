@@ -28,8 +28,8 @@ services:
       - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2}
     volumes:
       - ./.roguedata:/data
-    extra_hosts:
-      - "host.docker.internal:host-gateway"   # reach host services (Ollama) from Linux engines
+    # Docker Desktop resolves host.docker.internal automatically. On a plain
+    # Linux engine only, add: extra_hosts: ["host.docker.internal:host-gateway"]
 
   # ----------------------------------------------------------------------------
   # PAPER trading loop (GCP-free, IBKR live feed). Opt-in via the "paper"
@@ -58,10 +58,12 @@ services:
     environment:
       - EXECUTION_MODE=PAPER
       - OPS_MODE=PAPER
+      - OPS_ENV=${OPS_ENV:-STAGING}
+      - OPS_VERSION=${OPS_VERSION:-paper}
       - ROGUE_OPS_HOME=/data
       - IBKR_HOST=host.docker.internal
       - IBKR_PORT=4002
-      - IBKR_ACCOUNT_ID=${IBKR_ACCOUNT_ID:-}
+      - IBKR_ACCOUNT_ID=${IBKR_ACCOUNT_ID:-PAPER}
       - PRIMARY_SYMBOL=${PRIMARY_SYMBOL:-SPY}
       - IBKR_BAR_SIZE=${IBKR_BAR_SIZE:-1 min}
       - OLLAMA_SHADOW=${OLLAMA_SHADOW:-1}
@@ -69,5 +71,4 @@ services:
       - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2}
     volumes:
       - ./.roguedata:/data
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    # host.docker.internal is built-in on Docker Desktop (see console note above).
