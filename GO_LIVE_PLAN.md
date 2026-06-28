@@ -27,7 +27,7 @@ CAPITAL mode, with **hard** limits, not aspirations:
 | Guardrail | Go-live setting | Where |
 |---|---|---|
 | Position size | **1 contract** (drop `MAX_CAPITAL_CONTRACTS` 5 → 1) | execution_router |
-| Daily loss kill | a number you can lose and not care — **owner to set `$___`** | daily_loss_governor |
+| Daily loss kill | **$250** (`MAX_DAILY_LOSS_USD`) — confirmed by owner | daily_loss_governor |
 | Kill switch | armed, cross-process, console button live | governance/kill_switch |
 | Session | RTH only; entries 10:00–14:30 ET; flat 15:55; no overnight | research/intraday rules |
 | Preflight | account balance + connectivity check passes | capital_preflight |
@@ -66,17 +66,17 @@ process, not a failure of the timeline.
 
 ## Capital preflight / re-cert checklist (sign before first CAPITAL run)
 - [ ] IBKR account = the intended one; buying power confirmed; **paper→live port** change is deliberate.
-- [ ] `MAX_CAPITAL_CONTRACTS = 1`; daily-loss kill = `$___`; both unit-tested.
+- [ ] `MAX_CAPITAL_CONTRACTS = 1`; daily-loss kill = `$250` (`MAX_DAILY_LOSS_USD`); both unit-tested.
 - [ ] Kill switch verified live (console button halts the loop on the box).
 - [ ] Preflight passes (balance + connectivity); fail-closed on failure.
 - [ ] One real 1-contract round-trip observed and reconciled (fill price → P&L → governor).
 - [ ] Owner has read the edge verdict and accepts the risk at this size.
 - [ ] Re-cert signed + dated.
 
-## What I need from you to proceed now
-1. `docker` exec permission (in progress).
-2. IB Gateway paper @4002 + `vendor/ibapi`.
-3. Your **daily-loss number** — the dollar amount you can lose in a day and genuinely not care. That becomes the hard kill.
+## What I needed from you (now resolved)
+1. ~~`docker` exec permission~~ — **done** (policy root added; `docker` 29.5.2 reachable).
+2. ~~IB Gateway paper @4002 + `vendor/ibapi`~~ — **done** (Gateway connected, 78 live bars pulled; `ibapi` installs from PyPI — no host vendoring needed).
+3. ~~Daily-loss number~~ — **set: $250** (`MAX_DAILY_LOSS_USD`, wired into the paper loop's governor).
 
 ## Honest bottom line
 In 2 weeks you can have a real-money-*capable*, fully-gated, 1-contract system and

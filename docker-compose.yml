@@ -61,6 +61,7 @@ services:
       - OPS_ENV=${OPS_ENV:-STAGING}
       - OPS_VERSION=${OPS_VERSION:-paper}
       - ROGUE_OPS_HOME=/data
+      - MAX_DAILY_LOSS_USD=${MAX_DAILY_LOSS_USD:-250}   # hard daily-loss kill (USD)
       - IBKR_HOST=host.docker.internal
       - IBKR_PORT=4002
       - IBKR_ACCOUNT_ID=${IBKR_ACCOUNT_ID:-PAPER}
