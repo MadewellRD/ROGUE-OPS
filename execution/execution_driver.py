@@ -140,4 +140,13 @@ def execute_and_apply(
         # daily-loss kill can actually engage (applies to all live modes).
         record_realized_pnl(pnl_usd=exit_result["realized_pnl_usd"])
 
+        # Track record — append the paired closed trade to the scorecard ledger
+        # (real modes only; advisory, best-effort, never affects execution).
+        if envelope.execution_mode not in ("SIM", "REPLAY"):
+            try:
+                from capital.trade_ledger import record_closed_trade
+                record_closed_trade(exit_result)
+            except Exception:
+                pass
+
     return True

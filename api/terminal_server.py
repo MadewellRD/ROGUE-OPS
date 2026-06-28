@@ -98,6 +98,10 @@ class _Handler(BaseHTTPRequestHandler):
         if path == "/shadow/status":
             self._json(control.ollama_status())
             return
+        if path == "/scorecard":
+            q = parse_qs(route.query)
+            self._json(control.scorecard(_int(q.get("limit", ["1000"])[0], 1000)))
+            return
         if path == "/legacy":
             self._html(LEGACY_HTML)
             return

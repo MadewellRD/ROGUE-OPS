@@ -34,6 +34,7 @@ DEFAULT_TESTS = [
     "test_shadow_runner",
     "test_shadow_eval",
     "test_paper_ibkr",
+    "test_trade_ledger",
     "run_sim_regression",
 ]
 

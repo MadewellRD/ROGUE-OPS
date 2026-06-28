@@ -243,6 +243,13 @@ def shadow_eval(max_gap_sec: float = 1800.0) -> Dict[str, Any]:
     return {"ok": True, "eval": score(shadow_advisor.read_ledger(1_000_000), max_gap_sec=max_gap_sec)}
 
 
+def scorecard(limit: int = 1000) -> Dict[str, Any]:
+    """Track record from the paired-trade ledger (closed trades + scorecard)."""
+    from capital.trade_ledger import read_ledger, scorecard as _scorecard
+    rows = read_ledger(limit)
+    return {"ok": True, "scorecard": _scorecard(rows), "recent": rows[-25:]}
+
+
 def _asdict(read) -> Dict[str, Any]:
     from dataclasses import asdict
     return asdict(read)

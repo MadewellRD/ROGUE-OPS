@@ -137,6 +137,32 @@ class ExecutionPositionBridge:
         realized_pnl = round(pnl, 2)
 
         # --------------------------------------------------
+        # Paired-trade record (entry + exit) for the scorecard.
+        # Captured BEFORE we drop the position; advisory only.
+        # --------------------------------------------------
+
+        opened = getattr(position, "opened_at_utc", None)
+        closed = dt.datetime.utcnow()
+        held_seconds = (closed - opened).total_seconds() if isinstance(opened, dt.datetime) else None
+
+        paired = {
+            "realized_pnl_usd": realized_pnl,
+            "symbol": position.symbol,
+            "right": position.right,
+            "strike": position.strike,
+            "expiry": position.expiry,
+            "action": position.action,            # entry side (BUY/SELL)
+            "quantity": qty,
+            "entry_price": position.entry_price,
+            "exit_price": exit_price,
+            "opened_at_utc": str(opened) if opened else None,
+            "closed_at_utc": closed.replace(microsecond=0).isoformat() + "Z",
+            "held_seconds": round(held_seconds, 1) if held_seconds is not None else None,
+            "envelope_hash": getattr(envelope, "envelope_hash", None),
+            "execution_mode": getattr(envelope, "execution_mode", None),
+        }
+
+        # --------------------------------------------------
         # Authoritative mutation
         # --------------------------------------------------
 
@@ -146,6 +172,4 @@ class ExecutionPositionBridge:
         self.state_machine.on_position_closed()
         self.state_machine.on_audit_complete()
 
-        return {
-            "realized_pnl_usd": realized_pnl,
-        }
+        return paired
