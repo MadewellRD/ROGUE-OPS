@@ -110,3 +110,23 @@ class IBKRSnapshotProvider:
             return None  # no new bar since last emit
         self._last_t_ms = bars[-1].t_ms
         return snapshot_from_bars(self.symbol, bars, source=self.source)
+
+    def warmup_snapshots(self) -> List[MarketSnapshot]:
+        """Session bars so far -> ordered snapshots to pre-warm the indicators.
+
+        Returns one snapshot per bar EXCEPT the most recent: the live loop emits
+        the latest bar (and everything after) on its first call, so leaving it
+        out avoids double-counting. Fail-soft: [] on any error. A 0DTE session
+        engine must warm from the session's own history, not 35 minutes of
+        real-time bars after every (re)start."""
+        try:
+            bars = self._fetch()
+        except Exception as e:  # never propagate into startup
+            print(f"[IBKR-LIVE] warmup fetch error: {e}")
+            return []
+        out: List[MarketSnapshot] = []
+        for i in range(len(bars) - 1):
+            snap = snapshot_from_bars(self.symbol, bars[: i + 1], source=self.source)
+            if snap is not None:
+                out.append(snap)
+        return out

@@ -125,6 +125,23 @@ def run_market_loop(
     symbol = primary_symbol or "SPY"
     execution_mode = ops_config.mode
 
+    # Seed-warmup: feed the session's prior bars through the IndicatorEngine now
+    # so a freshly (re)started loop is warm and can act on the very next live
+    # bar, instead of waiting ~35 minutes for indicators to warm in real time.
+    # The hook is optional (getattr) and fail-soft, so SIM/replay providers that
+    # don't expose it are unaffected. The provider leaves the latest bar for the
+    # live loop, so nothing is double-counted.
+    _warmup = getattr(snapshot_provider, "warmup_snapshots", None)
+    if callable(_warmup):
+        try:
+            seeds = _warmup()
+            for _s in seeds:
+                indicator_engine.update(_s)
+            if seeds:
+                print(f"[MARKET LOOP] indicator seed-warmup: {len(seeds)} bars")
+        except Exception as e:
+            print(f"[MARKET LOOP] seed-warmup skipped: {e}")
+
     print("\n--- ROGUE MARKET RUNTIME STARTED (SignalEngine path) ---")
     iteration = 0
 

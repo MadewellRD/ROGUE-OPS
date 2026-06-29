@@ -72,10 +72,31 @@ def test_provider_throttle_dedupe_failsoft():
     assert p("SPY") is None
 
 
+def test_warmup_snapshots():
+    bars = [
+        Bar(t_ms=60_000, open=99.0, high=100.0, low=98.0, close=99.5, volume=500),
+        Bar(t_ms=120_000, open=99.5, high=101.0, low=99.0, close=100.7, volume=800),
+        Bar(t_ms=180_000, open=100.7, high=101.5, low=100.0, close=101.2, volume=900),
+    ]
+    p = IBKRSnapshotProvider("SPY", fetch_fn=lambda s, duration=None, bar_size=None: list(bars))
+    seeds = p.warmup_snapshots()
+    # all-but-last, ordered; the latest bar is left for the live loop (no double-count)
+    assert len(seeds) == 2, len(seeds)
+    assert abs(seeds[0].spot - 99.5) < 1e-9 and abs(seeds[1].spot - 100.7) < 1e-9
+    # empty / single-bar inputs -> nothing to pre-warm without leaving the latest out
+    assert IBKRSnapshotProvider("SPY", fetch_fn=lambda s, d=None, bar_size=None: []).warmup_snapshots() == []
+    assert IBKRSnapshotProvider("SPY", fetch_fn=lambda s, d=None, bar_size=None: [bars[0]]).warmup_snapshots() == []
+    # fail-soft: a raising fetch yields [] (never blocks startup)
+    def _boom(s, duration=None, bar_size=None):
+        raise RuntimeError("boom")
+    assert IBKRSnapshotProvider("SPY", fetch_fn=_boom).warmup_snapshots() == []
+
+
 def main() -> None:
     test_snapshot_from_bars()
     test_provider_throttle_dedupe_failsoft()
-    print("PAPER IBKR PASS — snapshot_from_bars OHLCV, provider throttle/dedupe/new-bar/fail-soft")
+    test_warmup_snapshots()
+    print("PAPER IBKR PASS — snapshot_from_bars OHLCV, provider throttle/dedupe/new-bar/fail-soft, seed-warmup")
 
 
 if __name__ == "__main__":

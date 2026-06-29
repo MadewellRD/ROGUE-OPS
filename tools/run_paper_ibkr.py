@@ -50,6 +50,17 @@ def main() -> None:
         print("[PAPER] Kill active — autonomy suppressed. Clear the kill file and restart to resume.")
         return
 
+    # Start the IBKR runtime up front so its streaming account-summary feed
+    # populates the balance store that PAPER position-sizing reads (sizing is
+    # balance-aware and fails closed without a fresh balance). Order execution
+    # reuses this same singleton connection.
+    try:
+        from broker.ibkr_runtime import get_ibkr_runtime
+        get_ibkr_runtime()
+        print(f"[PAPER] IBKR runtime connected ({host}:{port}) — streaming account balance.")
+    except Exception as e:
+        print(f"[PAPER] IBKR runtime init failed (balance feed unavailable): {e}")
+
     state_machine = StateMachineV2(ibkr_account_id=account_id)
     provider = IBKRSnapshotProvider(
         symbol,

@@ -5,6 +5,7 @@
 # PHASE 34a + PHASE 47 — BALANCE-AWARE SIZING (NON-PERMISSIVE)
 #
 
+import os
 from dataclasses import dataclass
 from typing import Optional, Dict, Any
 
@@ -80,10 +81,20 @@ class PositionSizingAuthority:
         # Balance snapshot (read-only)
         # --------------------------------------------------
 
-        balance: AccountBalanceSnapshot = AccountBalanceAuthority.snapshot(
-            account_id=account_id,
-            execution_mode=envelope.execution_mode,
-        )
+        # SIM fabricates a deterministic balance (producer path). PAPER/CAPITAL
+        # read the latest broker balance from the store, populated by the IBKR
+        # runtime's streaming account-summary feed (under ROGUE_BALANCE_ACCOUNT,
+        # default "IBKR"). The producer FORBIDS broker IO inside this authority.
+        if envelope.execution_mode == "SIM":
+            balance: AccountBalanceSnapshot = AccountBalanceAuthority.snapshot(
+                account_id=account_id,
+                execution_mode="SIM",
+            )
+        else:
+            balance = AccountBalanceAuthority.get_cached_snapshot(
+                account_id=os.getenv("ROGUE_BALANCE_ACCOUNT", "IBKR"),
+                max_age_seconds=int(os.getenv("BALANCE_MAX_AGE_SEC", "300")),
+            )
 
         sizing_reason: Dict[str, Any] = {
             "engine_version": PositionSizingAuthority.ENGINE_VERSION,

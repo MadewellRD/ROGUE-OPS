@@ -19,16 +19,17 @@
 import sqlite3
 import json
 import time
-from pathlib import Path
 
 from capital.account_balance_authority import AccountBalanceSnapshot
+from governance.paths import ops_home
 
 
 # ==================================================
-# Storage config
+# Storage config — on the shared ops volume (ROGUE_OPS_HOME) so the loop's
+# balance writer and the console's reader share it and it survives recreates.
 # ==================================================
 
-_DB_PATH = Path("data/balance_store.db")
+_DB_PATH = ops_home() / "balance_store.db"
 _DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 
