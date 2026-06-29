@@ -165,30 +165,18 @@ class AccountBalanceAuthority:
         max_age_seconds: int,
     ) -> AccountBalanceSnapshot:
         """
-        Retrieve a cached balance snapshot.
+        Consumer path (ROGUE-001 fix): read the latest broker balance that the
+        live IBKR runtime persists to the balance store (SQLite). Performs NO
+        broker IO here. Fails closed (missing/stale) inside balance_store.
 
-        This method:
-        - Performs NO broker IO
-        - Fails closed if snapshot missing, stale, or mismatched
+        Previously this read an in-process `_CACHED_SNAPSHOT` global that only the
+        SIM producer ever populated, so PAPER/CAPITAL sizing always raised
+        BALANCE_CACHE_EMPTY. The runtime writes balance_store (see
+        broker/ibkr_runtime.py) — exactly what capital_preflight reads — so the
+        consumer must read that store, not the in-process global. Keyed by
+        account_id, so account match is enforced by the lookup.
         """
 
-        with _CACHE_LOCK:
-            snap = _CACHED_SNAPSHOT
+        from capital.balance_store import get_snapshot
 
-        if snap is None:
-            raise RuntimeError("BALANCE_CACHE_EMPTY")
-
-        if snap.account_id != account_id:
-            raise RuntimeError("BALANCE_ACCOUNT_MISMATCH")
-
-        ts = dt.datetime.fromisoformat(
-            snap.timestamp_utc.replace("Z", "+00:00")
-        )
-        age = (dt.datetime.now(dt.timezone.utc) - ts).total_seconds()
-
-        if age > max_age_seconds:
-            raise RuntimeError(
-                f"BALANCE_SNAPSHOT_STALE:{int(age)}s>{max_age_seconds}s"
-            )
-
-        return snap
+        return get_snapshot(account_id=account_id, max_age_seconds=max_age_seconds)

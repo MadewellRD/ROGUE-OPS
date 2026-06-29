@@ -12,8 +12,13 @@
 | Priority | Meaning | Open | Done |
 |---|---|---|---|
 | **P0** | PAPER can trade & close safely (before trusting any paper result) | 4 | 0 |
-| **P1** | Required before any CAPITAL plumbing exposure | 6 | 0 |
-| **P2** | Hygiene / de-risk / surface reduction | 10 | 0 |
+| **P1** | Required before any CAPITAL plumbing exposure | 5 | 1 |
+| **P2** | Hygiene / de-risk / surface reduction | 13 | 1 |
+
+> **Progress 2026-06-29:** ROGUE-004 ☑ (ws_server deleted), ROGUE-009 ☑ (ARM now enforced
+> in `authorize_entry` via `governance/arm_switch`; `test_arm_gate` added), ROGUE-001 ◐
+> (sizing re-pointed to `balance_store`; in-container confirm pending). ROGUE-008 greenlit
+> (build real directional logic). New: ROGUE-024 (Massive WebSocket feed).
 
 > Reminder (carried from GO_LIVE_PLAN): plumbing readiness ≠ edge. **ROGUE-008** (no
 > directional logic / no proven edge) is the real CAPITAL gate and is independent of
@@ -24,7 +29,7 @@
 ## P0 — make PAPER actually trade & close safely
 | ID | Owner | Action | Gate (done = ) | Status |
 |---|---|---|---|---|
-| ROGUE-001 | Claude | Sizing reads the **wrong cache**. Point `position_sizing_authority` at `balance_store.get_snapshot(...)` (as `capital_preflight.py:129` already does), or hydrate `_CACHED_SNAPSHOT` from SQLite. | In-container `get_cached`/sizing returns a real balance; a PAPER ENTRY produces qty≥1 instead of `BALANCE_CACHE_EMPTY`. | ☐ |
+| ROGUE-001 | Claude | Sizing reads the **wrong cache**. Point `position_sizing_authority` at `balance_store.get_snapshot(...)` (as `capital_preflight.py:129` already does), or hydrate `_CACHED_SNAPSHOT` from SQLite. | In-container `get_cached`/sizing returns a real balance; a PAPER ENTRY produces qty≥1 instead of `BALANCE_CACHE_EMPTY`. | ◐ fix applied; in-container confirm pending |
 | ROGUE-002 | Claude | EXIT fill-missing raises **uncaught** and crashes the loop. Wrap the EXIT path; add `on_exit_failed` (mirror `on_entry_failed`); reconcile/cancel the working order before retry. | Forced no-fill exit: loop survives, state reverts, order cancelled, position not stranded. New test green. | ☐ |
 | ROGUE-003 | Claude | **No cancel, no reconnect** anywhere. Add cancel-on-timeout (`cancelOrder`/`reqGlobalCancel`); add reconnect + re-subscribe; wire `classify_ibkr_error`. | Timed-out order is cancelled at broker; simulated disconnect auto-reconnects and resumes. | ☐ |
 | ROGUE-015 | Claude | Tests are **SIM-only** → masked ROGUE-001/002. Add an integration test driving a real PAPER entry→exit round-trip (mocked broker fills incl. no-fill + partial). | Test in `tools/run_all_tests.py`, green, exercises the live lifecycle (not just SIM). | ☐ |
@@ -32,7 +37,7 @@
 ## P1 — required before any CAPITAL exposure
 | ID | Owner | Action | Gate (done = ) | Status |
 |---|---|---|---|---|
-| ROGUE-004 | Claude | Delete orphaned `api/ws_server.py` (network trade-executor with committed `CHANGE_ME` HMAC). | File removed; `grep ws_server` clean; suite green. | ☐ |
+| ROGUE-004 | Claude | Delete orphaned `api/ws_server.py` (network trade-executor with committed `CHANGE_ME` HMAC). | File removed; `grep ws_server` clean; suite green. | ☑ deleted |
 | ROGUE-005 | Claude | No auth on `/control/*`. Add a shared-secret/token check (kill/clear_kill/arm); tighten CORS. | Unauthenticated POST to `/control/*` is rejected; console sends the token. | ☐ |
 | ROGUE-006 | Claude | Partial fills booked as full closes. Inspect `remaining`; reconcile quantity. | Partial fill is not treated as a complete close; qty reconciled. New test. | ☐ |
 | ROGUE-007 | Claude | ENTRY no-fill strands an untracked real position. Cancel-on-timeout + late-fill reconciliation. | After an entry timeout, no untracked position can exist (order cancelled or tracked). | ☐ |
@@ -47,7 +52,7 @@
 | ROGUE-022 | Claude | Delete orphaned/broken modules calling nonexistent methods (`ibkr_balance_collector`, `ibkr_option_discovery`) + unused (`ibkr_errors`, `contract_cache`, `ibkr_runtime_entrypoint`, dead `governance/*`) + legacy `main.py`. | Removed; suite green. | ☐ |
 | ROGUE-010 | Claude | Remove dead duplicate P&L accumulator in `risk_engine.py` (hardcoded $250). | One P&L authority (the governor); no dead accumulator. | ☐ |
 | ROGUE-014 | Claude | Unify balance `source` semantics (runtime writes CAPITAL; collector wrote PAPER). | Single consistent `source`; preflight check unambiguous. | ☐ |
-| ROGUE-009 | Will + Claude | Console **ARM is cosmetic** (never read by execution). Make it gate PAPER entries, or remove the button. | ARM either enforces (no entry while disarmed) or is gone — no misleading control. | ⏸ |
+| ROGUE-009 | Will + Claude | Console **ARM is cosmetic** → **now enforced.** `governance/arm_switch.arm_active()`; `authorize_entry` denies PAPER/CAPITAL entries when disarmed (SIM exempt). | No entry while disarmed; `test_arm_gate` green. | ☑ enforced |
 | ROGUE-011 | Claude | Strike uses a **stale** last-bar close. Use a fresh quote midpoint for strike selection. | Strike derived from a current quote, not a stale bar. | ☐ |
 | ROGUE-012 | Claude | Connection multiplicity / clientId churn (singleton + per-fetch `_HistClient`). Reuse one connection. | Single IBKR client for data+exec; stable clientId; reconnect path. | ☐ |
 | ROGUE-023 | Claude | Prune/refresh stale docs (PHASE25_RECERT, PHASE3_SUMMARY, CAPITAL_GO_LIVE_AUTHORIZATION, ACTION_PLAN, EDGE_ROADMAP, CODEBASE_REVIEW). | Docs reflect reality; no false claims (e.g., "sizing reads the store"). | ☐ |
@@ -55,6 +60,7 @@
 | ROGUE-017 | Claude | `Position.opened_at_utc` naive `utcnow()` vs tz-aware elsewhere. | tz-aware throughout. | ☐ |
 | ROGUE-018 | Claude | Live balance `snapshot_hash=None` (audit fidelity). | Hash computed for live snapshots. | ☐ |
 | ROGUE-019 | Claude | Containers reach host Ollama `:11434` (advisory-only). Confirm intended; document. | Documented/scoped; no action if accepted. | ☐ |
+| ROGUE-024 | Will + Claude | **Massive WebSocket** real-time feed (the WS actually wanted; the deleted `ws_server` was unrelated). Stream live quotes to replace the stale last-bar spot (also addresses ROGUE-011). **Verify Massive WS entitlement on the current tier first.** | Live WS quotes feed the loop; strike derived from a real-time price, not a stale bar. | ☐ |
 
 ---
 

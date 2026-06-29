@@ -26,6 +26,7 @@ from execution.execution_envelope import ExecutionEnvelope
 from market.market_data import MarketSnapshot
 from governance.ops_state import get_ops_state
 from governance.kill_switch import kill_active, engage_kill
+from governance.arm_switch import arm_active
 from advisory.time_authority import evaluate_entry_time
 
 from governance.risk_engine import RiskEngineV2
@@ -126,6 +127,16 @@ class StateMachineV2:
 
         if self.positions.has_open_position():
             raise RuntimeError("Open position already exists")
+
+        # ----------------------------
+        # Operator ARM gate (ROGUE-009)
+        # PAPER/CAPITAL autonomy requires an explicit operator ARM (the console
+        # ARM button / durable ARM file). SIM is exempt. ARM is
+        # necessary-not-sufficient — CAPITAL still passes the capital gate in
+        # execution_router. This makes the console ARM real, not cosmetic.
+        # ----------------------------
+        if execution_mode in ("PAPER", "CAPITAL") and not arm_active():
+            raise RuntimeError("NOT_ARMED:operator ARM required for PAPER/CAPITAL autonomy")
 
         # ----------------------------
         # ENTRY Time Authority (PHASE 26)

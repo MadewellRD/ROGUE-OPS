@@ -37,6 +37,7 @@ DEFAULT_TESTS = [
     "test_trade_ledger",
     "test_massive_intraday",
     "test_entry_recovery",
+    "test_arm_gate",
     "run_sim_regression",
 ]
 
