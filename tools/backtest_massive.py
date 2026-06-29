@@ -20,23 +20,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from market.market_data_massive import intraday_bars
-from research.intraday import replay_intraday, simulate_intraday, walk_forward_intraday
+from research.intraday import replay_intraday, simulate_intraday, walk_forward_intraday, keep_rth
 from research.engine import metrics
 from research.strategies import INTRADAY_CANDIDATES
-
-
-def _rth_only(bars):
-    """Keep regular-session bars (09:30-15:59 ET, weekdays). Massive aggregates
-    include pre/post-market, which would corrupt the session/entry-window logic
-    that assumes each session starts at the open."""
-    from zoneinfo import ZoneInfo
-    et = ZoneInfo("America/New_York")
-    out = []
-    for b in bars:
-        t = dt.datetime.fromtimestamp(b.t_ms / 1000, tz=dt.timezone.utc).astimezone(et)
-        if t.weekday() < 5 and (t.hour > 9 or (t.hour == 9 and t.minute >= 30)) and t.hour < 16:
-            out.append(b)
-    return out
 
 
 def main() -> None:
@@ -52,7 +38,7 @@ def main() -> None:
     raw = intraday_bars(symbol, date_from, date_to, multiplier=bar_minutes, timespan="minute")
     if not raw:
         raise SystemExit("No bars returned from Massive (check tier/entitlement/date range).")
-    bars = _rth_only(raw)
+    bars = keep_rth(raw)
     print(f"    fetched {len(raw)} bars; {len(bars)} RTH bars after filter")
     rows = replay_intraday(symbol, bars, bar_minutes=bar_minutes)
     sessions = len({r["session"] for r in rows})

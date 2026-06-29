@@ -42,9 +42,33 @@ def test_intraday_bars_path_and_parse():
     assert bars[0].close == 100.5 and bars[1].close == 101.5
 
 
+def test_keep_rth_filters_to_regular_session():
+    import datetime as dt
+    from research.intraday import keep_rth
+
+    def ms(y, mo, d, h, mi):
+        return int(dt.datetime(y, mo, d, h, mi, tzinfo=dt.timezone.utc).timestamp() * 1000)
+
+    def bar(t, c):
+        return M.Bar(t_ms=t, open=c, high=c, low=c, close=c, volume=1)
+
+    bars = [
+        bar(ms(2026, 6, 24, 14, 0), 1.0),   # Wed 10:00 EDT -> keep
+        bar(ms(2026, 6, 24, 13, 30), 2.0),  # Wed 09:30 EDT -> keep (open, inclusive)
+        bar(ms(2026, 6, 24, 12, 0), 9.0),   # Wed 08:00 EDT -> drop (pre-market)
+        bar(ms(2026, 6, 24, 20, 0), 9.0),   # Wed 16:00 EDT -> drop (close, exclusive)
+        bar(ms(2026, 6, 27, 14, 0), 9.0),   # Sat           -> drop (weekend)
+        bar(ms(2026, 1, 7, 14, 30), 3.0),   # Wed 09:30 EST -> keep (DST off)
+        bar(ms(2026, 1, 7, 14, 0), 9.0),    # Wed 09:00 EST -> drop (pre-market)
+    ]
+    closes = sorted(b.close for b in keep_rth(bars))
+    assert closes == [1.0, 2.0, 3.0], closes
+
+
 def main() -> None:
     test_intraday_bars_path_and_parse()
-    print("MASSIVE INTRADAY PASS — intraday_bars builds the range path and parses sorted bars")
+    test_keep_rth_filters_to_regular_session()
+    print("MASSIVE INTRADAY PASS — intraday_bars range path/parse + RTH filter (EDT/EST, weekend, open/close bounds)")
 
 
 if __name__ == "__main__":

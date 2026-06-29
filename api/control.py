@@ -87,13 +87,17 @@ def run_research(
 ) -> Dict[str, Any]:
     """Run the backtest harness and return charting-ready JSON.
 
-    source = "massive_daily"  -> daily bars from Massive, daily strategies
-    source = "ibkr_intraday"  -> intraday bars from IBKR, intraday strategies
-                                 (requires TWS; falls back to an error dict)
+    source = "massive_daily"     -> daily bars from Massive, daily strategies
+    source = "massive_intraday"  -> intraday bars from Massive (RTH-filtered),
+                                    intraday strategies (no TWS)
+    source = "ibkr_intraday"     -> intraday bars from IBKR, intraday strategies
+                                    (requires TWS; falls back to an error dict)
     """
     try:
         if source == "ibkr_intraday":
             return _research_intraday(symbol, days, bar_size, cost_bps)
+        if source == "massive_intraday":
+            return _research_massive_intraday(symbol, days, bar_size, cost_bps)
         return _research_daily(symbol, days, cost_bps)
     except Exception as e:
         return {"ok": False, "source": source, "symbol": symbol, "error": str(e)}
@@ -163,6 +167,54 @@ def _research_intraday(symbol: str, days: int, bar_size: str, cost_bps: float) -
         "source": "ibkr_intraday",
         "symbol": symbol,
         "params": {"days": int(days), "bar_size": bar_size, "cost_bps": cost_bps},
+        "bars": len(rows),
+        "sessions": sessions,
+        "price": price,
+        "strategies": strategies,
+    }
+
+
+def _research_massive_intraday(symbol: str, days: int, bar_size: str, cost_bps: float) -> Dict[str, Any]:
+    """Intraday research on Massive bars (RTH-filtered) — same harness as the
+    IBKR path, but TWS-free and at scale (Options-Basic tier)."""
+    from market.market_data_massive import intraday_bars
+    from research.intraday import replay_intraday, simulate_intraday, walk_forward_intraday, keep_rth
+    from research.engine import metrics, equity_curve
+    from research.strategies import INTRADAY_CANDIDATES
+
+    parts = bar_size.split()
+    bm = int(parts[0]) * 60 if (len(parts) > 1 and "hour" in parts[1]) else int(parts[0])
+
+    today = dt.datetime.now(dt.timezone.utc).date()
+    date_from = (today - dt.timedelta(days=int(days))).isoformat()
+    date_to = today.isoformat()
+
+    raw = intraday_bars(symbol, date_from, date_to, multiplier=bm, timespan="minute")
+    if not raw:
+        return {"ok": False, "source": "massive_intraday", "symbol": symbol, "error": "no bars returned"}
+    bars = keep_rth(raw)
+    rows = replay_intraday(symbol, bars, bar_minutes=bm)
+    price = [{"date": r.get("date") or str(i), "close": r["close"]} for i, r in enumerate(rows)]
+    sessions = len({r["session"] for r in rows})
+
+    strategies = []
+    for s in INTRADAY_CANDIDATES:
+        trades = simulate_intraday(rows, s, cost_bps)
+        wf = walk_forward_intraday(rows, s, 0.6, cost_bps)
+        strategies.append({
+            "name": s.name, "note": s.note,
+            "metrics": metrics(trades),
+            "in_sample": wf["in_sample"], "out_of_sample": wf["out_of_sample"],
+            "trades": [_trade_dict(t) for t in trades],
+            "equity": equity_curve(trades),
+        })
+    strategies.sort(key=lambda x: x["out_of_sample"]["cum_return"], reverse=True)
+    return {
+        "ok": True,
+        "source": "massive_intraday",
+        "symbol": symbol,
+        "params": {"days": int(days), "bar_minutes": bm, "cost_bps": cost_bps,
+                   "date_from": date_from, "date_to": date_to, "rth_bars": len(bars), "raw_bars": len(raw)},
         "bars": len(rows),
         "sessions": sessions,
         "price": price,

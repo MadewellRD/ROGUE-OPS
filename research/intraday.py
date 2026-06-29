@@ -13,11 +13,41 @@
 # minutes-since-open are derived from the bar sequence — no tzdata dependency.
 #
 
+import datetime as dt
 from typing import Dict, List
 
 from market.market_data import MarketSnapshot
 from advisory.indicator_engine import IndicatorEngine
 from research.engine import Trade, metrics
+
+
+def _nth_sunday(year: int, month: int, n: int) -> dt.date:
+    first = dt.date(year, month, 1)
+    first_sun = first + dt.timedelta(days=(6 - first.weekday()) % 7)
+    return first_sun + dt.timedelta(days=7 * (n - 1))
+
+
+def _et_offset_hours(when_utc: dt.datetime) -> int:
+    """US-Eastern UTC offset with DST (EDT -4 from 2nd Sun Mar to 1st Sun Nov,
+    else EST -5). Dependency-free (no tzdata); date-granular at the ~2 DST
+    boundary days, which is immaterial for an RTH session filter."""
+    d = when_utc.date()
+    return -4 if (_nth_sunday(when_utc.year, 3, 2) <= d < _nth_sunday(when_utc.year, 11, 1)) else -5
+
+
+def keep_rth(bars: List) -> List:
+    """Keep regular-session bars (09:30-15:59 ET, weekdays). Vendor intraday
+    aggregates (e.g. Massive) include pre/post-market, which would corrupt the
+    session/entry-window logic that assumes each session starts at the open."""
+    out = []
+    for b in bars:
+        u = dt.datetime.fromtimestamp(b.t_ms / 1000, tz=dt.timezone.utc)
+        et = u + dt.timedelta(hours=_et_offset_hours(u))
+        if et.weekday() < 5:
+            mins = et.hour * 60 + et.minute
+            if 9 * 60 + 30 <= mins < 16 * 60:
+                out.append(b)
+    return out
 
 OPENING_RANGE_MIN = 30      # first 30 minutes define the opening range
 ENTRY_START_MIN = 30        # 10:00 ET (after the opening range)
