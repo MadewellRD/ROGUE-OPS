@@ -125,6 +125,26 @@ def daily_bars(symbol: str, date_from: str, date_to: str, *, api_key: Optional[s
     return parse_aggs(raw)
 
 
+def intraday_bars(
+    symbol: str,
+    date_from: str,
+    date_to: str,
+    *,
+    multiplier: int = 5,
+    timespan: str = "minute",
+    api_key: Optional[str] = None,
+    limit: int = 50000,
+) -> List[Bar]:
+    """Intraday OHLCV bars (e.g. 5-minute) for a stock/ETF over [from, to].
+    Requires the Options-Basic (intraday-entitled) tier. Returns sorted Bars."""
+    raw = _get(
+        f"/v2/aggs/ticker/{urllib.parse.quote(symbol)}/range/{int(multiplier)}/{timespan}/"
+        f"{date_from}/{date_to}?adjusted=true&sort=asc&limit={int(limit)}",
+        api_key=api_key,
+    )
+    return parse_aggs(raw)
+
+
 def option_prev_bar(option_ticker: str, *, api_key: Optional[str] = None) -> Optional[Bar]:
     """Previous-day OHLCV for an option contract (e.g. O:SPY260626C00734000)."""
     bars = parse_aggs(_get(f"/v2/aggs/ticker/{urllib.parse.quote(option_ticker)}/prev", api_key=api_key))
