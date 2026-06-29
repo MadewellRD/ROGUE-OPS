@@ -176,6 +176,17 @@ class StateMachineV2:
 
         self.state = SystemState.MANAGING_POSITION
 
+    def on_entry_failed(self) -> None:
+        """Recover from an entry that was AUTHORIZED but never opened (broker
+        unreachable/rejected, or no fill). `authorize_entry` advances IDLE ->
+        OPEN_POSITION before execution; if execution fails, `on_position_opened`
+        never fires and the machine would otherwise deadlock in OPEN_POSITION
+        (every later entry -> "System not IDLE"). This reverts to IDLE so the
+        loop can retry. A failed entry is recoverable, not a safety breach, so
+        it does NOT engage the kill. Only acts from OPEN_POSITION; else no-op."""
+        if self.state == SystemState.OPEN_POSITION:
+            self.state = SystemState.IDLE
+
     # ==================================================
     # POSITION MANAGEMENT
     # ==================================================

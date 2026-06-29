@@ -36,6 +36,7 @@ DEFAULT_TESTS = [
     "test_paper_ibkr",
     "test_trade_ledger",
     "test_massive_intraday",
+    "test_entry_recovery",
     "run_sim_regression",
 ]
 

@@ -106,9 +106,13 @@ def execute_and_apply(
             result = execute(envelope, account_id)
     except Exception as e:
         print(f"[ERROR] Execution failed for envelope {envelope.envelope_hash}: {e}")
+        if envelope.action == "ENTRY":
+            state_machine.on_entry_failed()   # recover: don't deadlock in OPEN_POSITION
         return False
 
     if result.status != "SUBMITTED":
+        if envelope.action == "ENTRY":
+            state_machine.on_entry_failed()   # recover: don't deadlock in OPEN_POSITION
         return False
 
     # --------------------------------------------------
@@ -122,6 +126,7 @@ def execute_and_apply(
         fill_price = result.raw.get("fill_price", entry_price)
         if fill_price is None:
             print("[ERROR] No fill price available for ENTRY.")
+            state_machine.on_entry_failed()   # recover: don't deadlock in OPEN_POSITION
             return False
 
         bridge.handle_entry(
