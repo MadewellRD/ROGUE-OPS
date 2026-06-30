@@ -254,6 +254,19 @@ class StateMachineV2:
 
         self.state = SystemState.POST_TRADE_AUDIT
 
+    def on_exit_failed(self) -> None:
+        """Recover from an EXIT that was authorized (manage_position advanced the
+        state to EXITING_POSITION) but did not complete — typically a no-fill /
+        timeout at the broker. Revert to MANAGING_POSITION so exit supremacy
+        re-evaluates and re-issues the exit next cycle, instead of stranding the
+        loop in EXITING_POSITION with a live position the engine can no longer
+        act on. The working order is cancelled in the broker layer before this is
+        called, so the retry does not double-submit. A no-fill is recoverable,
+        not a safety breach, so it does NOT engage the kill. Only acts from
+        EXITING_POSITION; else no-op."""
+        if self.state == SystemState.EXITING_POSITION:
+            self.state = SystemState.MANAGING_POSITION
+
     # ==================================================
     # AUDIT COMPLETION
     # ==================================================

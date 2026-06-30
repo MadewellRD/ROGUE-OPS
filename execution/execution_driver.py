@@ -136,10 +136,20 @@ def execute_and_apply(
         )
 
     elif envelope.action == "EXIT":
-        exit_result = bridge.handle_exit(
-            envelope=envelope,
-            result=result,
-        )
+        try:
+            exit_result = bridge.handle_exit(
+                envelope=envelope,
+                result=result,
+            )
+        except Exception as e:
+            # ROGUE-002: a no-fill / unconfirmed exit (e.g. EXIT_FILL_PRICE_MISSING)
+            # must NOT crash the loop or strand a live position. The working order
+            # was cancelled in the broker layer (ROGUE-003); revert EXITING ->
+            # MANAGING so exit supremacy re-issues the exit next cycle. A no-fill
+            # is recoverable, not a kill condition.
+            print(f"[EXIT] exit not confirmed for {envelope.envelope_hash}: {e}")
+            state_machine.on_exit_failed()
+            return False
 
         # Realized-loss governance — feed the daily-loss governor so the
         # daily-loss kill can actually engage (applies to all live modes).

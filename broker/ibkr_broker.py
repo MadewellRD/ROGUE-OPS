@@ -103,6 +103,17 @@ class IBKRBroker:
         fill_timeout = float(os.getenv("ROGUE_FILL_TIMEOUT_SECONDS", "6"))
         fill_price = runtime.wait_for_fill(oid, timeout=fill_timeout)
 
+        # ROGUE-003: never leave a working order behind. If it did not fill in
+        # the window, cancel it, then re-check briefly in case it filled during
+        # the cancel race. This stops a timed-out order from lingering at the
+        # broker and lets an EXIT safely retry without double-submitting.
+        if fill_price is None:
+            try:
+                runtime.cancel_order(oid)
+            except Exception as e:
+                print(f"[IBKR][CANCEL_ERROR] oid={oid}: {e}")
+            fill_price = runtime.wait_for_fill(oid, timeout=2.0)
+
         return BrokerOrderResult(
             order_id=oid,
             raw={

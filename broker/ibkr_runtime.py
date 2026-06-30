@@ -146,6 +146,19 @@ class IBKRRuntime(EWrapper, EClient):
             self._next_order_id += 1
             return oid
 
+    def cancel_order(self, order_id: int) -> None:
+        """Cancel a working order by id (ROGUE-003). Tolerates ibapi signature
+        differences across versions; never raises into the caller's hot path."""
+        try:
+            self.cancelOrder(order_id, "")
+        except TypeError:
+            try:
+                self.cancelOrder(order_id)
+            except Exception as e:
+                print(f"[IBKR][CANCEL_ERROR] oid={order_id}: {e}")
+        except Exception as e:
+            print(f"[IBKR][CANCEL_ERROR] oid={order_id}: {e}")
+
     def orderStatus(
         self,
         orderId,
