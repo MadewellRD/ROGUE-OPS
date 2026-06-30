@@ -11,7 +11,7 @@
 ## Scoreboard
 | Priority | Meaning | Open | Done |
 |---|---|---|---|
-| **P0** | PAPER can trade & close safely (before trusting any paper result) | 1 | 3 |
+| **P0** | PAPER can trade & close safely (before trusting any paper result) | 2 | 3 |
 | **P1** | Required before any CAPITAL plumbing exposure | 5 | 1 |
 | **P2** | Hygiene / de-risk / surface reduction | 13 | 1 |
 
@@ -21,6 +21,15 @@
 > deliberately left **DISARMED** — do not ARM for live paper trading until ROGUE-002/003
 > (safe exits) land, or a slow fill will crash the loop. ROGUE-008 greenlit
 > (build real directional logic). New: ROGUE-024 (Massive WebSocket feed).
+>
+> **Progress 2026-06-30 (ARMED, live):** pipeline proven end-to-end during RTH — Gateway
+> auto-reconnect (ROGUE-003 ☑ live), live moving data, balance read (ROGUE-001 ☑ live),
+> signal fired, every gate cleared. **ROGUE-026 (new, P0):** option sizing used underlying
+> notional (strike×100 ≈ $74.5k) → 0 contracts for any account under ~$3.7M; fixed to size a
+> long option on its **premium** bounded by the $250 daily cap (code + `test_options_sizing`,
+> 23/23 green). First real entry is now gated only by market hours: it missed today's 14:30 ET
+> cutoff (correct 0DTE rule) and will **auto-enter at tomorrow's 10:00–14:30 ET window** —
+> armed, always-up, no intervention. ROGUE-026 live + ROGUE-015 round-trip verify at that entry.
 
 > Reminder (carried from GO_LIVE_PLAN): plumbing readiness ≠ edge. **ROGUE-008** (no
 > directional logic / no proven edge) is the real CAPITAL gate and is independent of
