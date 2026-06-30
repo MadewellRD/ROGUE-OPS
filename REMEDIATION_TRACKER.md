@@ -11,13 +11,15 @@
 ## Scoreboard
 | Priority | Meaning | Open | Done |
 |---|---|---|---|
-| **P0** | PAPER can trade & close safely (before trusting any paper result) | 4 | 0 |
+| **P0** | PAPER can trade & close safely (before trusting any paper result) | 1 | 3 |
 | **P1** | Required before any CAPITAL plumbing exposure | 5 | 1 |
 | **P2** | Hygiene / de-risk / surface reduction | 13 | 1 |
 
 > **Progress 2026-06-29:** ROGUE-004 ☑ (ws_server deleted), ROGUE-009 ☑ (ARM now enforced
-> in `authorize_entry` via `governance/arm_switch`; `test_arm_gate` added), ROGUE-001 ◐
-> (sizing re-pointed to `balance_store`; in-container confirm pending). ROGUE-008 greenlit
+> in `authorize_entry` via `governance/arm_switch`; `test_arm_gate` added), ROGUE-001 ☑
+> (sizing reads `balance_store`; verified $5,148 netliq in-container). **Note:** the loop is
+> deliberately left **DISARMED** — do not ARM for live paper trading until ROGUE-002/003
+> (safe exits) land, or a slow fill will crash the loop. ROGUE-008 greenlit
 > (build real directional logic). New: ROGUE-024 (Massive WebSocket feed).
 
 > Reminder (carried from GO_LIVE_PLAN): plumbing readiness ≠ edge. **ROGUE-008** (no
@@ -29,10 +31,10 @@
 ## P0 — make PAPER actually trade & close safely
 | ID | Owner | Action | Gate (done = ) | Status |
 |---|---|---|---|---|
-| ROGUE-001 | Claude | Sizing reads the **wrong cache**. Point `position_sizing_authority` at `balance_store.get_snapshot(...)` (as `capital_preflight.py:129` already does), or hydrate `_CACHED_SNAPSHOT` from SQLite. | In-container `get_cached`/sizing returns a real balance; a PAPER ENTRY produces qty≥1 instead of `BALANCE_CACHE_EMPTY`. | ◐ fix applied; in-container confirm pending |
-| ROGUE-002 | Claude | EXIT fill-missing raises **uncaught** and crashes the loop. Wrap the EXIT path; add `on_exit_failed` (mirror `on_entry_failed`); reconcile/cancel the working order before retry. | Forced no-fill exit: loop survives, state reverts, order cancelled, position not stranded. New test green. | ☐ |
-| ROGUE-003 | Claude | **No cancel, no reconnect** anywhere. Add cancel-on-timeout (`cancelOrder`/`reqGlobalCancel`); add reconnect + re-subscribe; wire `classify_ibkr_error`. | Timed-out order is cancelled at broker; simulated disconnect auto-reconnects and resumes. | ☐ |
-| ROGUE-015 | Claude | Tests are **SIM-only** → masked ROGUE-001/002. Add an integration test driving a real PAPER entry→exit round-trip (mocked broker fills incl. no-fill + partial). | Test in `tools/run_all_tests.py`, green, exercises the live lifecycle (not just SIM). | ☐ |
+| ROGUE-001 | Claude | Sizing reads the **wrong cache**. Point `position_sizing_authority` at `balance_store.get_snapshot(...)` (as `capital_preflight.py:129` already does), or hydrate `_CACHED_SNAPSHOT` from SQLite. | In-container `get_cached`/sizing returns a real balance; a PAPER ENTRY produces qty≥1 instead of `BALANCE_CACHE_EMPTY`. | ☑ verified: `get_cached_snapshot` → $5,148 netliq in `rogue-loop` |
+| ROGUE-002 | Claude | EXIT fill-missing raises **uncaught** and crashes the loop. Wrap the EXIT path; add `on_exit_failed` (mirror `on_entry_failed`); reconcile/cancel the working order before retry. | Forced no-fill exit: loop survives, state reverts, order cancelled, position not stranded. New test green. | ☑ `on_exit_failed` + driver try/except; `test_exit_recovery` |
+| ROGUE-003 | Claude | **No cancel, no reconnect** anywhere. Add cancel-on-timeout (`cancelOrder`/`reqGlobalCancel`); add reconnect + re-subscribe; wire `classify_ibkr_error`. | Timed-out order is cancelled at broker; simulated disconnect auto-reconnects and resumes. | ☑ cancel-on-no-fill (`cancel_order` + recheck) + reconnect watchdog (1101/1102 health); validated connects cleanly — forced-drop reconnect not yet observed |
+| ROGUE-015 | Claude | Tests are **SIM-only** → masked ROGUE-001/002. Add an integration test driving a real PAPER entry→exit round-trip (mocked broker fills incl. no-fill + partial). | Test in `tools/run_all_tests.py`, green, exercises the live lifecycle (not just SIM). | ◐ exit lifecycle covered (`test_exit_recovery`); full live PAPER round-trip still pending |
 
 ## P1 — required before any CAPITAL exposure
 | ID | Owner | Action | Gate (done = ) | Status |
@@ -66,8 +68,8 @@
 
 ## Sign-off checklist (before P0 is declared complete)
 - [ ] ROGUE-001 — a real PAPER ENTRY sizes and submits (observed in `rogue-loop`).
-- [ ] ROGUE-002 — a forced no-fill EXIT recovers cleanly; loop does not crash.
-- [ ] ROGUE-003 — a timed-out order is cancelled; a forced disconnect reconnects.
+- [x] ROGUE-002 — a forced no-fill EXIT recovers cleanly; loop does not crash. (`test_exit_recovery`)
+- [~] ROGUE-003 — cancel-on-no-fill + reconnect watchdog implemented & live; forced-disconnect reconnect not yet observed.
 - [ ] ROGUE-015 — PAPER entry→exit integration test is in the suite and green.
 - [ ] One full paper round-trip observed end-to-end (signal → order → fill → P&L → governor → ledger).
 
