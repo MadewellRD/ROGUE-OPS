@@ -54,6 +54,7 @@ class IBKRRuntime(EWrapper, EClient):
     """
 
     SNAPSHOT_INTERVAL_SECONDS = 2
+    RECONNECT_INTERVAL_SECONDS = 5
 
     def __init__(self, host: str = "127.0.0.1", port: int = 7497):
         EClient.__init__(self, self)
@@ -63,6 +64,7 @@ class IBKRRuntime(EWrapper, EClient):
         # ------------------------
         self._ready = threading.Event()
         self._connected = False
+        self._reconnect_lock = threading.Lock()
 
         # ------------------------
         # Order id sequencing (monotonic, thread-safe)
@@ -96,13 +98,14 @@ class IBKRRuntime(EWrapper, EClient):
         )
 
         # ------------------------
-        # Connect Once, Stay Connected
+        # Connect (and reconnect — ROGUE-003). Persist endpoint + clientId so the
+        # reconnect watchdog can re-establish the SAME client session on a drop.
         # ------------------------
-        self.connect(
-            host,
-            port,
-            clientId=int(time.time()) % 10_000,
-        )
+        self._host = host
+        self._port = port
+        self._client_id = int(time.time()) % 10_000
+
+        self.connect(host, port, clientId=self._client_id)
 
         threading.Thread(target=self.run, daemon=True).start()
 
@@ -119,6 +122,10 @@ class IBKRRuntime(EWrapper, EClient):
         )
 
         self._snapshot_thread.start()
+
+        # Reconnect watchdog (ROGUE-003): if the client<->TWS socket drops, this
+        # re-establishes the session + re-subscribes the account feed. Kill-aware.
+        threading.Thread(target=self._reconnect_loop, daemon=True).start()
 
     # ==================================================
     # Lifecycle Callbacks
@@ -285,9 +292,13 @@ class IBKRRuntime(EWrapper, EClient):
             with self._order_id_lock:
                 self._order_messages[reqId] = f"{errorCode}: {errorString}"
 
-        # Treat hard disconnects as unhealthy
+        # Treat hard disconnects as unhealthy; connectivity-restored codes
+        # (1101/1102) mark the session healthy again so the snapshot loop and
+        # execution resume without requiring a full client reconnect.
         if errorCode in (-1, 507, 1100):
             self._connected = False
+        elif errorCode in (1101, 1102):
+            self._connected = True
 
     # ==================================================
     # Account Summary (STREAMING CALLBACKS)
@@ -358,6 +369,56 @@ class IBKRRuntime(EWrapper, EClient):
             except Exception as e:
                 # Fail closed by staleness; do not crash runtime
                 print(f"[IBKR][SNAPSHOT_ERROR] {e}")
+
+    # ==================================================
+    # Reconnect watchdog (ROGUE-003)
+    # ==================================================
+
+    def _reconnect_loop(self):
+        """Ensure the client<->TWS socket stays up; reconnect if it drops.
+        Kill-aware (never re-establishes autonomy while halted) and fail-soft —
+        a no-op while connected, so it is harmless under normal operation."""
+        while True:
+            time.sleep(self.RECONNECT_INTERVAL_SECONDS)
+            if kill_active():
+                continue
+            try:
+                connected = self.isConnected()
+            except Exception:
+                connected = False
+            if not connected:
+                self._reconnect()
+
+    def _reconnect(self):
+        """Re-establish the IBKR session and re-subscribe the streaming account
+        feed. Single-flight (lock), kill-aware, never raises into the watchdog."""
+        with self._reconnect_lock:
+            try:
+                if self.isConnected() or kill_active():
+                    return
+            except Exception:
+                pass
+            print(f"[IBKR][RECONNECT] socket down — reconnecting {self._host}:{self._port} (clientId={self._client_id})")
+            try:
+                self._ready.clear()
+                self._connected = False
+                try:
+                    self.disconnect()   # clean socket before re-connecting
+                except Exception:
+                    pass
+                self.connect(self._host, self._port, clientId=self._client_id)
+                threading.Thread(target=self.run, daemon=True).start()
+                if not self._ready.wait(timeout=15):
+                    print("[IBKR][RECONNECT] timed out waiting for nextValidId; will retry")
+                    return
+                self.reqAccountSummary(
+                    reqId=1,
+                    groupName="All",
+                    tags="NetLiquidation,AvailableFunds,ExcessLiquidity,BuyingPower",
+                )
+                print("[IBKR][RECONNECT] reconnected — account summary re-subscribed")
+            except Exception as e:
+                print(f"[IBKR][RECONNECT] failed: {e}")
 
 
 # ==================================================
