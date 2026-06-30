@@ -40,6 +40,7 @@ DEFAULT_TESTS = [
     "test_exit_recovery",
     "test_arm_gate",
     "test_options_backtest",
+    "test_options_sizing",
     "run_sim_regression",
 ]
 

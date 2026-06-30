@@ -52,6 +52,7 @@ class PositionSizingAuthority:
         max_notional_usd: Optional[float] = None,
         max_pct_of_net_liq: float = 0.02,
         max_pct_of_available: float = 0.25,
+        est_premium: Optional[float] = None,
     ) -> SizedExecutionEnvelope:
         """
         Produce a SizedExecutionEnvelope.
@@ -112,47 +113,49 @@ class PositionSizingAuthority:
         sizing_reason["contract_ceiling"] = max_contracts
 
         # --------------------------------------------------
-        # Notional ceiling
+        # Per-contract cash-at-risk (ROGUE-026)
+        # For a LONG option the outlay / max loss is the PREMIUM, not the
+        # underlying notional (strike * multiplier). Size on the live premium
+        # estimate when available; SIM keeps the deterministic strike basis so its
+        # parity is unchanged. Without a premium estimate (no quote) the strike
+        # basis applies and sizing fails closed — consistent with the broker
+        # refusing an unpriceable order.
         # --------------------------------------------------
 
         opt = envelope.intent.option
         if not opt:
             raise RuntimeError("Notional sizing requires option context")
 
-        per_contract_notional = opt.strike * opt.multiplier
+        if envelope.execution_mode != "SIM" and est_premium is not None and est_premium > 0:
+            per_contract_cost = est_premium * opt.multiplier
+            sizing_reason["est_premium"] = est_premium
+        else:
+            per_contract_cost = opt.strike * opt.multiplier
+        sizing_reason["per_contract_cost"] = per_contract_cost
 
         if max_notional_usd is not None:
-            max_qty_by_notional = int(max_notional_usd // per_contract_notional)
+            max_qty_by_notional = int(max_notional_usd // per_contract_cost)
             final_qty = min(final_qty, max_qty_by_notional)
             sizing_reason["max_qty_by_notional"] = max_qty_by_notional
 
         # --------------------------------------------------
-        # Balance-relative ceilings (PRODUCTION ONLY)
+        # Per-trade risk budget (NON-SIM)
+        # A long option's max loss is the premium; a single trade must not be able
+        # to exceed the daily-loss cap (the real governor). This replaces the prior
+        # 2%-of-net-liq-on-underlying-notional rule, which divided a tiny budget by
+        # a huge notional and zeroed every option trade.
         # --------------------------------------------------
 
         if envelope.execution_mode != "SIM":
-            max_notional_by_netliq = balance.net_liquidation * max_pct_of_net_liq
-            max_notional_by_available = (
-                balance.available_funds * max_pct_of_available
-            )
-
-            effective_notional_cap = min(
-                max_notional_by_netliq,
-                max_notional_by_available,
-            )
-
-            max_qty_by_balance = int(
-                effective_notional_cap // per_contract_notional
-            )
-
-            final_qty = min(final_qty, max_qty_by_balance)
-
+            risk_budget = float(os.getenv("MAX_DAILY_LOSS_USD", "250"))
+            max_qty_by_risk = int(risk_budget // per_contract_cost)
+            final_qty = min(final_qty, max_qty_by_risk)
             sizing_reason.update(
                 {
-                    "max_pct_net_liq": max_pct_of_net_liq,
-                    "max_pct_available": max_pct_of_available,
-                    "effective_notional_cap": effective_notional_cap,
-                    "max_qty_by_balance": max_qty_by_balance,
+                    "risk_budget_usd": risk_budget,
+                    "max_qty_by_risk": max_qty_by_risk,
+                    "net_liquidation": balance.net_liquidation,
+                    "available_funds": balance.available_funds,
                 }
             )
         else:

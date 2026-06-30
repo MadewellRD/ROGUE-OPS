@@ -163,6 +163,23 @@ def execute(envelope: ExecutionEnvelope, account_id: str) -> ExecutionResult:
 # AUTHORITATIVE EXECUTION — ENTRY (SIZED ONLY)
 # ==================================================
 
+def _estimate_option_premium(intent):
+    """Live NBBO-based premium estimate for sizing (ROGUE-026). IBKR is the
+    options venue. Fail-soft: returns None if no quote, so sizing fails closed —
+    consistent with the broker refusing an unpriceable order downstream."""
+    try:
+        if not intent.option:
+            return None
+        from broker.ibkr_runtime import get_ibkr_runtime
+        from broker.ibkr_contracts import build_option_contract
+        rt = get_ibkr_runtime()
+        bid, ask = rt.get_quote(build_option_contract(intent.symbol, intent.option))
+        px = ask if (ask and ask > 0) else bid
+        return float(px) if (px and px > 0) else None
+    except Exception:
+        return None
+
+
 def execute_sized(envelope: ExecutionEnvelope, account_id: str) -> ExecutionResult:
     audit = get_audit_store()
 
@@ -218,19 +235,23 @@ def execute_sized(envelope: ExecutionEnvelope, account_id: str) -> ExecutionResu
     if not envelope.authorized or not envelope.risk_ok:
         return _blocked(audit, envelope, "RISK_OR_AUTH")
 
+    est_premium = _estimate_option_premium(envelope.intent)
+
     sized: SizedExecutionEnvelope = PositionSizingAuthority.size(
         envelope=envelope,
         account_id=account_id,
         max_contracts=max_contracts,
         max_notional_usd=max_notional,
+        est_premium=est_premium,
     )
 
     qty = sized.final_quantity
-    strike = envelope.intent.option.strike
-    notional = strike * OPTION_MULTIPLIER * qty
-
-    if notional > MAX_CAPITAL_NOTIONAL_USD:
-        return _blocked(audit, envelope, "CAPITAL_NOTIONAL_LIMIT", {"notional": notional})
+    # ROGUE-026: a long option's cash-at-risk is the PREMIUM, not the underlying
+    # notional (strike * multiplier). Bound the premium outlay by the cap.
+    if est_premium and est_premium > 0:
+        outlay = est_premium * OPTION_MULTIPLIER * qty
+        if outlay > MAX_CAPITAL_NOTIONAL_USD:
+            return _blocked(audit, envelope, "CAPITAL_NOTIONAL_LIMIT", {"outlay": outlay})
 
     try:
         runtime = get_broker_runtime(envelope.intent)
