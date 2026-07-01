@@ -30,6 +30,15 @@
 > 23/23 green). First real entry is now gated only by market hours: it missed today's 14:30 ET
 > cutoff (correct 0DTE rule) and will **auto-enter at tomorrow's 10:00–14:30 ET window** —
 > armed, always-up, no intervention. ROGUE-026 live + ROGUE-015 round-trip verify at that entry.
+>
+> **Update (RTH, same session):** proven live all the way to **order submission** — delayed
+> market data enabled (**ROGUE-027**: `reqMarketDataType(3)`) so option quotes flow on a paper
+> account without OPRA; sizing (026) passes; a real IBKR order is submitted. IBKR then
+> **rejected** it — **ROGUE-028**: a ~$5.1k account cannot hold a naked SPY 0DTE call
+> (`code=201`, projected post-expiration margin deficit ~$33k, because 1 contract ≈ $74.5k of
+> stock at exercise). Naked long options are **margin-infeasible at this account size** —
+> independently confirming the **defined-risk spread pivot** (ROGUE-008/E1). To fill a naked
+> demo, raise the IBKR paper balance (~$100k+); the real path is spreads.
 
 > Reminder (carried from GO_LIVE_PLAN): plumbing readiness ≠ edge. **ROGUE-008** (no
 > directional logic / no proven edge) is the real CAPITAL gate and is independent of
