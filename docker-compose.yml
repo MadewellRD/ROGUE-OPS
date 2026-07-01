@@ -67,6 +67,17 @@ services:
       - IBKR_ACCOUNT_ID=${IBKR_ACCOUNT_ID:-PAPER}
       - PRIMARY_SYMBOL=${PRIMARY_SYMBOL:-SPY}
       - IBKR_BAR_SIZE=${IBKR_BAR_SIZE:-1 min}
+      # PAPER demo: the account has no real-time OPRA sub, so quotes are DELAYED
+      # (type 3) and a marketable LIMIT won't fill against stale pricing. Market
+      # orders guarantee a paper fill so the full lifecycle is observable. This is
+      # PAPER-ONLY — leave OFF (unset) for CAPITAL; naked MKT on 0DTE is unsafe.
+      - IBKR_MKT_DATA_TYPE=${IBKR_MKT_DATA_TYPE:-3}
+      - ROGUE_FORCE_MKT=${ROGUE_FORCE_MKT:-1}
+      - ROGUE_FILL_TIMEOUT_SECONDS=${ROGUE_FILL_TIMEOUT_SECONDS:-15}
+      # PAPER demo: widen the entry cutoff to near-close so a trade fires this
+      # session (default is 14:30 ET / 18:30 UTC). Revert (unset) for realistic
+      # 0DTE timing — the 15:55 hard-exit still flattens either way.
+      - ROGUE_LAST_ENTRY_UTC=${ROGUE_LAST_ENTRY_UTC:-19:55}
       - OLLAMA_SHADOW=${OLLAMA_SHADOW:-1}
       - OLLAMA_HOST=http://host.docker.internal:11434
       - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2}

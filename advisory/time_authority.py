@@ -29,9 +29,22 @@ from typing import Tuple, Literal
 # Canonical UTC session boundaries (NYSE RTH)
 # ==================================================
 
+def _env_utc_time(name: str, default: dt.time) -> dt.time:
+    """Optional UTC 'HH:MM' override (env) — lets a PAPER demo widen the entry
+    window. CAPITAL leaves the default (14:30 ET cutoff)."""
+    v = os.getenv(name)
+    if v:
+        try:
+            hh, mm = (int(x) for x in v.split(":"))
+            return dt.time(hh, mm)
+        except Exception:
+            pass
+    return default
+
+
 MARKET_OPEN_UTC = dt.time(13, 30)   # 09:30 ET
 MIDDAY_UTC = dt.time(16, 0)         # 12:00 ET
-LAST_ENTRY_UTC = dt.time(18, 30)    # 14:30 ET
+LAST_ENTRY_UTC = _env_utc_time("ROGUE_LAST_ENTRY_UTC", dt.time(18, 30))  # 14:30 ET default
 MARKET_CLOSE_UTC = dt.time(20, 0)   # 16:00 ET
 
 

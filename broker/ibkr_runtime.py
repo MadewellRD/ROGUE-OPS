@@ -112,6 +112,15 @@ class IBKRRuntime(EWrapper, EClient):
         if not self._ready.wait(timeout=15):
             raise RuntimeError("IBKR_RUNTIME_INIT_TIMEOUT")
 
+        # Request DELAYED market data (type 3) so option quotes work on paper
+        # accounts without a real-time OPRA subscription (ROGUE-027). get_quote
+        # already handles delayed ticks (66/67). Env: IBKR_MKT_DATA_TYPE.
+        try:
+            import os as _os
+            self.reqMarketDataType(int(_os.getenv("IBKR_MKT_DATA_TYPE", "3")))
+        except Exception as _e:
+            print(f"[IBKR][MKTDATATYPE_ERROR] {_e}")
+
         # ------------------------
         # Subscribe to Account Summary (STREAMING)
         # ------------------------
@@ -416,6 +425,11 @@ class IBKRRuntime(EWrapper, EClient):
                     groupName="All",
                     tags="NetLiquidation,AvailableFunds,ExcessLiquidity,BuyingPower",
                 )
+                try:
+                    import os as _os
+                    self.reqMarketDataType(int(_os.getenv("IBKR_MKT_DATA_TYPE", "3")))
+                except Exception:
+                    pass
                 print("[IBKR][RECONNECT] reconnected — account summary re-subscribed")
             except Exception as e:
                 print(f"[IBKR][RECONNECT] failed: {e}")
