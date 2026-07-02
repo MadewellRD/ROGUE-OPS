@@ -30,7 +30,12 @@ from research.intraday import _et_offset_hours
 _LAST_CALL = [0.0]
 
 
-def _bt_get(path: str, tries: int = 6, min_interval: float = 1.0) -> Dict:
+def _bt_get(path: str, tries: int = 6, min_interval: Optional[float] = None) -> Dict:
+    if min_interval is None:
+        import os
+        # Throttle between REST calls. Default 1.0s survives the rate-limited tier;
+        # set MASSIVE_MIN_INTERVAL=0.02 once on the unlimited plan for a fast sweep.
+        min_interval = float(os.getenv("MASSIVE_MIN_INTERVAL", "1.0"))
     for k in range(tries):
         wait = min_interval - (_time.time() - _LAST_CALL[0])
         if wait > 0:
