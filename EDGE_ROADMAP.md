@@ -70,3 +70,32 @@ look, but it's a real build that must first clear an **option-priced backtest wi
 losses included**. Until E1 shows a positive out-of-sample number, **capital stays NO-GO**
 and the safest, most honest use of the (now P0-hardened) machine is gathering paper
 evidence — not trading.
+
+## E1 RESULTS — 2026-07-02 (Massive unlimited; real option minute-aggregates)
+
+0DTE iron condor on SPY, 90 days, **55 expiries**, walk-forward 60/40, $6 cost/round-trip,
+entry ~10:00 ET, held to settlement. Five configs (short-strike % OTM / wing width):
+
+| short% / wing | exp $/trade | win % | worst | total | **OOS exp** | OOS total |
+|---|---|---|---|---|---|---|
+| 0.4% / $2 | −10.91 | 65% | −181 | −600 | **−19.46** | −428 |
+| 0.6% / $2 | −11.04 | 76% | −183 | −607 | **−16.95** | −373 |
+| 0.8% / $3 | −13.55 | 87% | −281 | −745 | **−26.00** | −572 |
+| 1.2% / $5 | −18.68 | 53% | −483 | −1028 | **−30.03** | −661 |
+| 0.6% / $5 | −15.29 | 78% | −451 | −841 | **−32.23** | −709 |
+
+**Verdict: NO EDGE. E1 gate = STOP.** Every config loses, in-sample AND out-of-sample, and
+degrades out-of-sample. Pushing strikes further OTM raises the win rate to 87% but the tail
+losses grow faster — the textbook premium-selling trap (0DTE premium is efficiently priced;
+retail selling it pays the costs + eats the tail). This is the second edge family tested and
+rejected: **directional (long calls/puts) = no edge; defined-risk premium (condors) = no edge.**
+
+## Conclusion
+
+Both plausible edge families are exhausted and negative on real data, IS and OOS. **There is
+no demonstrated edge in this system.** Per the gate, we STOP: do not build E2/E3, do not
+deploy capital. This is a *success* of the evidence process — a well-built, safe, audited
+machine was prevented from trading a strategy that loses. The system's honest value is as a
+hardened execution + research **platform**; real capital stays **NO-GO** until genuinely novel
+signal research (e.g. IV/greeks/flow — now available on the data plan) produces a positive,
+cost-aware, out-of-sample edge. Absent that, the disciplined answer is not to trade.

@@ -62,7 +62,7 @@
 | ROGUE-006 | Claude | Partial fills booked as full closes. Inspect `remaining`; reconcile quantity. | Partial fill is not treated as a complete close; qty reconciled. New test. | ☐ |
 | ROGUE-007 | Claude | ENTRY no-fill strands an untracked real position. Cancel-on-timeout + late-fill reconciliation. | After an entry timeout, no untracked position can exist (order cancelled or tracked). | ☐ |
 | ROGUE-013 | Claude | `clear_kill` is unauthenticated (folds into ROGUE-005). | `clear_kill` requires the token; durable kill not clearable from an unauthenticated caller. | ☐ |
-| ROGUE-008 | Will + Claude | **The real gate: no edge.** Decide — build genuine directional logic (PUTs, EMA/MACD/RSI/VWAP signs) or accept the NO-GO and stay paper. | A written edge verdict on the best available data; CAPITAL decision made on it, not on plumbing. | ⏸ |
+| ROGUE-008 | Will + Claude | **The real gate: no edge.** Decide — build genuine directional logic (PUTs, EMA/MACD/RSI/VWAP signs) or accept the NO-GO and stay paper. | A written edge verdict on the best available data; CAPITAL decision made on it, not on plumbing. | ☑ **VERDICT: NO EDGE** — directional (calls+puts) and 0DTE iron condor (5 configs, 55 expiries) both negative IS **and** OOS on real option data. E1=STOP. Capital **NO-GO**. See `EDGE_ROADMAP.md`. |
 
 ## P2 — hygiene, de-risk, surface reduction
 | ID | Owner | Action | Gate (done = ) | Status |
