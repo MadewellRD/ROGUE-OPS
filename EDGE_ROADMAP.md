@@ -99,3 +99,29 @@ machine was prevented from trading a strategy that loses. The system's honest va
 hardened execution + research **platform**; real capital stays **NO-GO** until genuinely novel
 signal research (e.g. IV/greeks/flow — now available on the data plan) produces a positive,
 cost-aware, out-of-sample edge. Absent that, the disciplined answer is not to trade.
+
+## Foundational forward-return study — 2026-07-05 (daily, 2 years, unlimited data)
+
+Before expanding DTE / symbol / structure, tested the prerequisite: does ANY signal predict
+N-day forward returns of the ETF, out-of-sample? Signals: ETF 10-day momentum, mega-cap
+top-10 breadth-momentum (5d), breadth (% up). Targets: 1/3/5/7-day forward returns of
+SPY/QQQ/IWM. Walk-forward 60/40, Pearson corr(signal, forward), IS vs OOS — 36 cells.
+
+**Result: OOS correlations ≈ 0 (noise).** Only 1 of 36 cells exceeds |corr|≥0.10 — and it's
+NEGATIVE, on IWM (weakest instrument). Signs flip IS→OOS. The few small-positive QQQ cells
+(max OOS corr +0.076, ~0.6% of variance) are within chance across 36 tests. **No predictive
+power: momentum and top-10 breadth do not forecast SPY/QQQ/IWM forward returns, any horizon.**
+
+## FINAL edge conclusion
+
+Three independent tests on real data, all negative out-of-sample:
+1. 0DTE directional (long calls/puts, trend) — no edge.
+2. 0DTE iron condor (5 configs, 55 expiries) — no edge, degrades OOS.
+3. Multi-day forward returns from momentum + top-10 breadth (3 ETFs × 4 horizons) — OOS corr ≈ 0.
+
+No signal tested predicts returns, so **no DTE, symbol, or structure choice will make money** —
+the efficient-market result. **Capital is NO-GO, comprehensively and on evidence.** Further
+edge work would require genuinely different inputs (options flow/positioning, event or
+vol-surface signals) and is speculative, low-base-rate research — not more permutations of
+price momentum. Disciplined outcome: do not trade real capital. The system's value is a
+hardened execution + research platform, and the judgment to have proven the negative cleanly.
