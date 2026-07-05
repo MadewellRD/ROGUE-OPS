@@ -1,118 +1,134 @@
 # ROGUE:OPS — Retail Options Gamma Utility Engine
 
-A deterministic, kill-dominant automated trading system for US index options
-(SPY / IWM, 0DTE). It turns market data into risk-gated, envelope-sealed orders
-across a multi-broker boundary, with safety controls that fail closed.
+A safety-first, deterministic **autonomous trading engine** for US index options
+(SPY / IWM, 0DTE) — built as an execution + research platform. Every order flows
+through an immutable, hashed, kill-dominant, fail-closed `ExecutionEnvelope`.
 
-> **Status:** SIM-verified and **paper-verified on IBKR** (live equity + 0DTE
-> option fills with real fill capture). Guarded by an automated test suite.
-> **Not cleared for live capital** — see [Go-live gates](#go-live-gates).
+> ⚠️ **Not financial advice. No warranty. Not a money-maker.**
+> Trading options can lose your entire capital. This system has **no demonstrated
+> trading edge** — that was tested on real data and confirmed negative (see
+> [`EDGE_ROADMAP.md`](EDGE_ROADMAP.md)). It is published as an **engineering +
+> research showcase**, for education only. By the project's own evidence,
+> real-money deployment is **NO-GO**. Use entirely at your own risk.
 
 ---
 
-## What it does
+## Why this repo is worth reading
+
+The interesting part isn't a strategy — it's the discipline:
+
+1. **A production-grade safety envelope for autonomous options trading** — cross-process
+   kill switch, operator ARM gate, daily-loss governor from real fills, sealed/dual-hashed
+   execution envelopes, capability-routed multi-broker boundary, marketable-limit-or-refuse
+   pricing, safe no-fill/partial-fill recovery, and an IBKR reconnect watchdog. All
+   fail-closed, all covered by tests.
+2. **A full, honest edge investigation** — three independent strategy families backtested on
+   real option + equity data, walk-forward out-of-sample, **all negative** — and the
+   engineering judgment to say *no* to capital rather than deploy a proven loser.
+
+Build it well, then prove the negative cleanly. That's the project.
+
+## Architecture (live path)
 
 ```
-market snapshot ──▶ indicators ──▶ SignalEngine ──▶ StateMachine ──▶ ExecutionEnvelope ──▶ broker boundary ──▶ IBKR / Robinhood
-   (market/)        (advisory/)     (advisory/)      (execution/)        (sealed)            (broker/)
-                  VWAP·ATR·RSI·     entry signal     authorize +                          options→IBKR
-                  EMA·MACD                           risk/time/capital gates              equities→Robinhood
+IBKR live bars ─▶ IndicatorEngine ─▶ SignalEngine ─▶ StateMachine ─▶ ExecutionEnvelope ─▶ broker ─▶ IBKR (options)
+  (market/)        (advisory/)        (advisory/)     (execution/)     (sealed + hashed)   (broker/)   marketable-limit
+                 EMA·RSI·MACD·ATR·VWAP  entry signal   arm/risk/time/capital gates                     or refuse
 ```
 
-The live decision path is **market → indicators → SignalEngine → state machine →
-execution → broker**. Open positions are managed and exited before any new entry
-(*exit supremacy*). Every execution flows through an immutable, sealed
-`ExecutionEnvelope`; nothing trades without one.
+Open positions are managed and exited before any new entry (*exit supremacy*). Nothing
+trades without a sealed `ExecutionEnvelope`.
 
 ## Safety model (fail-closed by design)
 
-- **Kill switch** — process-dominant and irreversible per run; checked at envelope creation, the execution router, and the state machine.
-- **Daily-loss governor** — accrues realized P&L from *actual fills*; on breach it engages the kill and blocks further entries.
-- **Marketable-limit pricing** — 0DTE options are priced off the live NBBO; if no quote is available the order is **refused** rather than sent as a naked market order.
-- **Capability-routed brokers** — options route to IBKR, equities to Robinhood; routing an instrument to a broker that can't trade it is blocked (`BROKER_UNSUPPORTED`).
-- **Hard mode gates** — `LIVE`/`CAPITAL` require explicit env and pass startup gates; SIM/REPLAY are fully self-contained.
+- **Kill switch** — durable + cross-process (a file under `ROGUE_OPS_HOME`), irreversible per
+  run, re-checked at every authority boundary; the console KILL button halts the loop.
+- **ARM gate** — PAPER/CAPITAL entries require an explicit operator ARM; SIM is exempt.
+- **Daily-loss governor** — accrues realized P&L from *actual fills*; engages the kill on
+  breach (default `$250`) and blocks further entries.
+- **Sealed envelopes** — every order is an immutable, dual-SHA-256 `ExecutionEnvelope`,
+  verified before any broker contact.
+- **Safe order lifecycle** — options priced off live NBBO as a marketable limit (naked market
+  orders refused unless explicitly forced); no-fill exits recover instead of stranding;
+  timed-out orders are cancelled; a reconnect watchdog restores a dropped IBKR session.
+- **Capital gate** — real-money mode requires explicit `CAPITAL_ARMED` + a passing preflight;
+  layered and fail-closed.
+
+## The honest edge verdict
+
+The machine is sound; the strategy is not. Tested on real data, walk-forward out-of-sample:
+
+| Strategy family | Result |
+|---|---|
+| 0DTE directional (long calls/puts, trend/breadth) | no edge |
+| 0DTE iron condor (5 configs, 55 expiries, real option prices) | no edge, degrades OOS |
+| Momentum + top-10 breadth vs 1/3/5/7-day forward returns (SPY/QQQ/IWM) | OOS corr ≈ 0 |
+
+No signal tested predicts returns, so no DTE/symbol/structure choice makes money — the
+efficient-market result. Full reasoning in [`EDGE_ROADMAP.md`](EDGE_ROADMAP.md); a complete
+codebase audit in [`CODEBASE_AUDIT.md`](CODEBASE_AUDIT.md); remediation log in
+[`REMEDIATION_TRACKER.md`](REMEDIATION_TRACKER.md).
 
 ## Repo layout
 
 | Path | Purpose |
 |------|---------|
-| `main.py`, `ops_config.py` | entrypoint + immutable runtime config / mode gating |
-| `market/` | SteadyAPI data adapter, `MarketSnapshot`, the live `market_loop` |
-| `advisory/` | rolling `IndicatorEngine` (VWAP/ATR/RSI/EMA/MACD) + `SignalEngine` |
-| `execution/` | state machine, sealed envelope, router, position store/bridge, exit engine, sizing |
-| `broker/` | `BrokerRuntime` boundary + IBKR adapter + Robinhood MCP adapter + pricing |
-| `capital/` | balance store, daily-loss governor, capital gate, preflight |
-| `governance/` | kill switch, risk engine, ops state, cross-platform paths, audit store |
-| `api/` | operator terminal (`terminal_server.py`, `terminal_state.py`, `terminal.html`) |
-| `tools/` | test suite, `run_all_tests.py`, IBKR/Robinhood smoke + probe tools |
-| `sim_golden/` | deterministic SIM golden record |
-| `arbitration/`, `strategy/` | legacy council/arbitration scaffolding — **not on the live path** |
+| `market/` | IBKR live snapshot feed, `MarketSnapshot`, the `market_loop` |
+| `advisory/` | rolling `IndicatorEngine` (EMA/RSI/MACD/ATR/VWAP) + `SignalEngine` + optional Ollama shadow advisor |
+| `execution/` | state machine, sealed envelope, router, position store/bridge, exit engine, position sizing |
+| `broker/` | `BrokerRuntime` boundary + IBKR runtime/broker + pricing (+ Robinhood MCP for equities) |
+| `capital/` | balance store, daily-loss governor, capital gate/preflight, trade ledger + scorecard |
+| `governance/` | kill switch, arm switch, risk engine, ops state, paths, audit store, bootstrap |
+| `api/` | operator console (`terminal_server.py`, `terminal_state.py`, `console.html`) |
+| `research/` | backtest harness, strategy candidates, intraday study, options backtest, forward-return study |
+| `tools/` | 23-test suite (`run_all_tests.py`), paper entrypoint (`run_paper_ibkr.py`), probes |
 
-## Quickstart — SIM (no broker, no cloud)
+## Quickstart
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements-sim.txt
+### SIM + tests (no broker, no cloud)
 
-$env:OPS_MODE="SIM"; $env:OPS_ENV="DEV"; $env:OPS_VERSION="0.0.0-sim"; $env:EXECUTION_MODE="SIM"
-python main.py --mode SIM
+```bash
+python tools/run_all_tests.py      # 23 tests, each in an isolated process
 ```
 
-Full details in [`SIM_RUNBOOK.md`](SIM_RUNBOOK.md).
+### Paper trading (Dockerized, IBKR feed)
 
-## Tests
+Requires IB Gateway (paper, port `4002`, API enabled, paper disclaimer accepted).
 
-```powershell
-python tools\run_all_tests.py
+```bash
+docker compose --profile paper up -d --build
+# operator console: http://127.0.0.1:8787   (loopback only)
 ```
 
-Runs pricing, broker routing, indicators, the full market-loop lifecycle, the
-safety governor, fill→P&L→kill, and the SIM regression — each in an isolated
-process. CI runs the same suite on every push via `.github/workflows/ci.yml`.
+See [`DOCKER.md`](DOCKER.md). The loop starts **disarmed** — it will not enter until you ARM
+it from the console; the daily-loss kill and all gates remain in force.
 
-## Operator terminal
-
-```powershell
-python -m api.terminal_server      # → http://localhost:8787
-```
-
-A local, read-only dashboard: capital, daily-loss risk, open position, SPY/IWM
-price + VWAP, the indicator stack, signal state, broker routing, and kill status.
-Details in [`TERMINAL.md`](TERMINAL.md).
-
-## Brokers
-
-- **IBKR (options + equities)** — requires TWS or IB Gateway running, API enabled, socket port `7497` (paper). Live option pricing needs the real-time OPRA market-data subscription. Paper verification: `python tools\ibkr_paper_smoke.py`.
-- **Robinhood (equities, beta)** — connects to Robinhood's Agentic Trading MCP via a headless client + one-time OAuth. Setup in [`ROBINHOOD_SETUP.md`](ROBINHOOD_SETUP.md).
-
-Backend selection: `BROKER=IBKR|ROBINHOOD` (or capability default); equity broker via `EQUITY_BROKER`.
-
-## Configuration
+## Configuration (env)
 
 | Env | Purpose |
 |-----|---------|
-| `OPS_MODE` / `OPS_ENV` / `OPS_VERSION` | runtime identity (SIM/REPLAY/PAPER/LIVE) |
 | `EXECUTION_MODE` | `SIM` / `PAPER` / `CAPITAL` |
-| `ROGUE_OPS_HOME` | runtime data/audit root (cross-platform; default per-OS) |
-| `IBKR_HOST` / `IBKR_PORT` | TWS/Gateway socket (default `127.0.0.1:7497`) |
-| `MAX_DAILY_LOSS_USD` | daily realized-loss kill threshold (default 250) |
+| `ROGUE_OPS_HOME` | runtime data/audit root (cross-platform) |
+| `IBKR_HOST` / `IBKR_PORT` | Gateway socket (paper `4002`) |
+| `MAX_DAILY_LOSS_USD` | daily realized-loss kill threshold (default `250`) |
 | `OPS_KILL_SWITCH` | `true` to force kill at startup |
+| `OLLAMA_SHADOW` | `1` to enable the advisory-only, execution-isolated LLM shadow read |
 
-## Go-live gates
+## Security / operating notes
 
-The system is **not** cleared for live capital until:
+- Secrets live in **gitignored** `.env` / `.massive_key` — never committed (verified: no keys
+  in tree or history).
+- The operator console binds **loopback only** (`127.0.0.1:8787`) and is **unauthenticated** —
+  do not expose it to a network.
+- `.roguedata/` (balances, trade ledger, kill file, audit) is gitignored and operator-local.
 
-1. [`PHASE25_RECERT.md`](PHASE25_RECERT.md) is signed (execution-path re-certification).
-2. The IBKR **OPRA real-time options data** subscription is active (so option pricing runs without overrides).
-3. Robinhood OAuth token is provisioned (for the equities path).
+## License
 
-See [`ACTION_PLAN.md`](ACTION_PLAN.md) for the full assessment and roadmap, and
-[`PHASE3_SUMMARY.md`](PHASE3_SUMMARY.md) for the hardening record.
+**AGPL-3.0.** Network/SaaS use requires source disclosure. See [`LICENSE`](LICENSE).
 
 ## Disclaimer
 
-Trading options carries a substantial risk of loss and is not suitable for every
-investor. This is software provided **as-is**, with no warranty, and is **not
-financial advice**. Validate everything in paper/SIM; any live use and its
-consequences are solely your responsibility.
+Trading options carries a substantial risk of **total loss** and is not suitable for every
+investor. This software is provided **as-is**, with **no warranty**, and is **not financial
+advice**. It has **no proven edge** (proven negative in this repo). Any use — paper or live —
+and all of its consequences are solely your responsibility.
