@@ -1,3 +1,17 @@
+<div align="center">
+
+<img src="assets/rogue-ops-banner.svg" alt="ROGUE:OPS — Retail Options Gamma Utility Engine" width="820">
+
+[![CI](https://github.com/MadewellRD/ROGUE-OPS/actions/workflows/ci.yml/badge.svg)](https://github.com/MadewellRD/ROGUE-OPS/actions/workflows/ci.yml)
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org)
+[![Docker](https://img.shields.io/badge/docker-ready-2496ED.svg)](DOCKER.md)
+[![tests](https://img.shields.io/badge/tests-23%20passing-brightgreen.svg)](tools/run_all_tests.py)
+[![status](https://img.shields.io/badge/status-research%20showcase-blueviolet.svg)](EDGE_ROADMAP.md)
+[![not financial advice](https://img.shields.io/badge/not-financial%20advice-lightgrey.svg)](#disclaimer)
+
+</div>
+
 # ROGUE:OPS — Retail Options Gamma Utility Engine
 
 A safety-first, deterministic **autonomous trading engine** for US index options

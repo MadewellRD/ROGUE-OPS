@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 300" role="img" aria-label="ROGUE:OPS — Retail Options Gamma Utility Engine">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b1020"/>
+      <stop offset="1" stop-color="#0d1117"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#39d353"/>
+      <stop offset="1" stop-color="#58a6ff"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="300" fill="url(#bg)"/>
+
+  <!-- faint grid -->
+  <g stroke="#18212e" stroke-width="1">
+    <line x1="0" y1="75" x2="1200" y2="75"/>
+    <line x1="0" y1="150" x2="1200" y2="150"/>
+    <line x1="0" y1="225" x2="1200" y2="225"/>
+    <line x1="200" y1="0" x2="200" y2="300"/>
+    <line x1="400" y1="0" x2="400" y2="300"/>
+    <line x1="600" y1="0" x2="600" y2="300"/>
+    <line x1="800" y1="0" x2="800" y2="300"/>
+    <line x1="1000" y1="0" x2="1000" y2="300"/>
+  </g>
+
+  <!-- gamma curve motif -->
+  <path d="M0,255 C280,255 400,70 600,70 C800,70 920,255 1200,255" fill="none"
+        stroke="url(#accent)" stroke-width="3" opacity="0.35"/>
+
+  <!-- wordmark -->
+  <text x="72" y="152" font-family="Consolas,'SFMono-Regular',Menlo,monospace"
+        font-size="84" font-weight="700" fill="#e6edf3">ROGUE<tspan fill="#39d353">:</tspan>OPS</text>
+
+  <!-- subtitle -->
+  <text x="76" y="198" font-family="'Segoe UI',Arial,sans-serif"
+        font-size="23" letter-spacing="6" fill="#8b949e">RETAIL OPTIONS GAMMA UTILITY ENGINE</text>
+
+  <!-- tagline -->
+  <text x="76" y="234" font-family="Consolas,'SFMono-Regular',monospace"
+        font-size="17" fill="#58a6ff">deterministic · kill-dominant · fail-closed · evidence-gated</text>
+</svg>
